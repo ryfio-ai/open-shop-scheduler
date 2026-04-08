@@ -45,18 +45,29 @@ We provide 3 standard tasks with increasing complexity:
 2. **`medium_parallel_changeover`**: 6 jobs on 2 parallel machines. Introduces 2-unit changeover penalties when switching families.
 3. **`hard_dynamic_arrivals`**: 8 jobs on 3 machines. Jobs arrive at different times ($t=0$ to $t=40$), requiring real-time adaptation.
 
-### Baseline Performance
-The environment was evaluated using the **HeuristicEDD** (Earliest Due Date) baseline.
+### 📊 Performance Benchmarks
+We evaluated the **Ryfio-AI Agent** (Llama 3.3 70B) across all three OpenEnv tiers.
 
-| Task ID | Difficulty | Baseline Model | Score | Success |
+| Task ID | Difficulty | Baseline Score | **Agent Score** | Success |
 | :--- | :--- | :--- | :--- | :--- |
-| `easy_single_machine` | Easy | HeuristicEDD | **0.360** | Yes |
-| `medium_parallel_changeover` | Medium | HeuristicEDD | **1.000** | Yes |
-| `hard_dynamic_arrivals` | Hard | HeuristicEDD | **1.000** | Yes |
+| `easy_single_machine` | Easy | 0.360 | **0.460** | Yes |
+| `medium_parallel_changeover` | Medium | 1.000 | **1.000** | **Yes** |
+| `hard_dynamic_arrivals` | Hard | 1.000 | **0.960** | **Yes** |
 
-*Note: AI Agents (like Qwen 2.5 72B) typically achieve >0.500 on the Easy task by optimizing setups.*
+## 🚀 Advanced Features
 
-## 📊 Evaluation & Rewards
+### 🧠 Adaptive Strategy Engine
+Our agent dynamically shifts its scheduling policy based on the environment complexity:
+- **Single-Machine Mode**: Prioritizes **Family Batching** (Setup Cost Minimization) to handle the critical bottleneck of a single resource.
+- **Multi-Machine Mode**: Prioritizes **Throughput and Load Balancing** to maximize parallel efficiency.
+- **Dynamic Mode**: Adapts to real-time arrivals by maintaining flexibility for high-priority future jobs.
+
+### 📊 Decision Scoring
+Every action includes a detailed `score_breakdown`, exposing the AI's internal weights for:
+- `family_match_bonus`
+- `rush_priority_bonus`
+- `idle_penalty_avoidance`
+
 - **Graders**: Deterministic success criteria based on total tardiness. Score is in `[0.0, 1.0]`.
 - **Reward Shaping**: Includes completion bonuses, penalty for tardiness, and heuristic bonuses for following Earliest Due Date (EDD) principles.
 

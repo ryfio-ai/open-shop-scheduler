@@ -15,7 +15,7 @@ def get_client_and_models():
     """Returns (OpenAI client, list of model IDs) based on available API keys."""
     if GROQ_API_KEY:
         client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=GROQ_API_KEY)
-        models = ["llama-3.1-8b-instant", "gemma2-9b-it", "mixtral-8x7b-32768"]
+        models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama-3.2-3b-preview"]
         return client, models
 
     if HF_TOKEN:
@@ -25,6 +25,55 @@ def get_client_and_models():
         return client, [model_name]
 
     return None, []
+
+# --- Strategic Hierarchies ---
+STRATEGIES = {
+    "Single Machine": """
+1. FAMILY MATCH (TOP PRIORITY): Batching is CRITICAL here. Prioritize jobs matching the machine's current family to avoid setup penalties.
+2. RUSH JOB: Assign rush jobs only after checking for family matches.
+3. UTILIZATION MANDATE: NEVER leave the machine idle if jobs are pending. If no family match exists and no rush jobs are available, you MUST take the setup penalty and assign the job with the earliest due date immediately. Sitting idle is always more expensive than a setup penalty if work is waiting.
+""",
+    "Multi-Machine": """
+1. RUSH JOBS FIRST: Assign urgent tasks across all available machines.
+2. FAMILY MATCH: Match jobs to machines with the same current family.
+3. LOAD BALANCE: Maximize utilization by using all idle machines. Never leave a machine idle if a job is pending.
+4. LEAST PENALTY SWITCH: Use EDD and priority for non-matching jobs.
+""",
+    "Dynamic Arrivals": """
+1. RUSH JOBS FIRST: Process urgent arrivals immediately.
+2. FAMILY MATCH: Group jobs by family to minimize changeover costs.
+3. KEEP FLEXIBLE: If machines are idle and a high-priority arrival is expected soon, you may wait briefly, but otherwise MAXIMIZE UTILIZATION.
+4. MIN FUTURE PENALTY: Prioritize high-priority and short-deadline jobs.
+"""
+}
+
+def detect_task_strategy(task_id: str, mode: str = "Auto") -> str:
+    if mode != "Auto":
+        return mode
+    if "single_machine" in task_id:
+        return "Single Machine"
+    if "hard" in task_id or "dynamic" in task_id:
+        return "Dynamic Arrivals"
+    return "Multi-Machine"
+
+def get_system_prompt(strategy_name: str) -> str:
+    hierarchy = STRATEGIES.get(strategy_name, STRATEGIES["Multi-Machine"])
+    return f"""You are an ADAPTIVE manufacturing scheduler. YOU MUST follow this {strategy_name} hierarchy:
+
+{hierarchy}
+
+CRITICAL SCHEMA RULES:
+- Respond ONLY with a valid JSON object.
+- 'assignments' must contain ONLY valid {{machine_id, job_id}} for IDLE machines.
+- PROVIDE a 'score_breakdown' object showing weights (0-100) for your primary decision:
+  {{ "family_match_bonus": X, "rush_priority_bonus": Y, "idle_penalty_avoidance": Z }}
+
+Example Format:
+{{
+  "assignments": [{{"machine_id": "M1", "job_id": "J1"}}],
+  "reasoning": "Matching family A to machine M1 to avoid setup cost.",
+  "score_breakdown": {{ "family_match": 80, "utilization": 20 }}
+}}"""
 
 # --- Logging helpers (OpenEnv compliant) ---
 def log_start(task: str, env: str, model: str) -> str:
@@ -45,26 +94,11 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> st
     print(line, flush=True)
     return line
 
-# --- Elite Scheduling Prompt ---
-ELITE_PROMPT = (
-    "You are an ELITE manufacturing scheduler. Your goal is a 1.000 score by following this STRATEGIC HIERARCHY:\n\n"
-    "1. RUSH JOBS FIRST: Identify all 'rush' jobs in 'jobs_pending'. Assign them immediately to any idle machines.\n"
-    "2. FAMILY MATCH: For remaining idle machines, prioritize jobs that match the machine's 'current_family' to avoid the 2-unit setup penalty.\n"
-    "3. NO IDLE MACHINES: You must use ALL available machines. If a machine is idle and a job is pending, assign it.\n"
-    "4. LEAST PENALTY SWITCH: If no family match exists, choose a job that minimizes future penalties (due dates & priority).\n\n"
-    "CRITICAL SCHEMA RULES:\n"
-    "- Respond ONLY with a valid JSON object.\n"
-    "- 'assignments' must contain ONLY valid {machine_id, job_id} objects for machines that are CURRENTLY 'idle'.\n"
-    "- NO COMMENTS OR STRINGS inside the list.\n"
-    "Example: {\"assignments\": [{\"machine_id\": \"M1\", \"job_id\": \"J1\"}], \"reasoning\": \"...\"}"
-)
-
 def clean_assignments(assignments: list, obs) -> list:
     valid_assignments = []
-    seen_machines = set()
-    seen_jobs = set()
+    seen_machines, seen_jobs = set(), set()
     pending_job_ids = {job.job_id for job in obs.jobs_pending}
-    idle_machine_ids = {m.machine_id for m in obs.machines if m.state == "idle"}
+    idle_machine_ids = {m.machine_id for m in obs.machines if m.status == "idle"}
 
     for a in assignments:
         if not isinstance(a, dict): continue
@@ -77,110 +111,82 @@ def clean_assignments(assignments: list, obs) -> list:
     return valid_assignments
 
 # --- Gradio streaming generator ---
-def run_inference_generator(task_id: str):
+def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_override: Optional[str] = None):
     client, models_to_try = get_client_and_models()
+    if model_override:
+        models_to_try = [model_override] + models_to_try
+    
     if not client:
         yield "Error: No API key set. Please set GROQ_API_KEY or HF_TOKEN."
         return
 
     env = ShopSchedulerEnv(task_id=task_id)
     obs = env.reset()
+    
+    strategy = detect_task_strategy(task_id, strategy_mode)
+    system_prompt = get_system_prompt(strategy)
+    
     log_history = [log_start(task=task_id, env="shop_scheduler_env", model=models_to_try[0])]
-    yield "\n".join(log_history)
+    yield f"--- Strategy: {strategy} ---\n" + "\n".join(log_history)
 
     done, step_count, rewards = False, 0, []
 
-    try:
-        while not done and step_count < 25:
-            prompt = obs.model_dump_json()
-            success_call, action_data = False, {}
+    while not done and step_count < 25:
+        prompt = obs.model_dump_json()
+        success_call, action_data = False, {}
 
-            for model_attempt in models_to_try:
-                try:
-                    resp = client.chat.completions.create(
-                        model=model_attempt,
-                        messages=[{"role": "system", "content": ELITE_PROMPT}, {"role": "user", "content": prompt}],
-                        timeout=30
-                    )
-                    content = resp.choices[0].message.content
-                    if "```json" in content:
-                        content = content.split("```json")[1].split("```")[0]
-                    data = json.loads(content)
-                    if "assignments" in data:
-                        data["assignments"] = clean_assignments(data["assignments"], obs)
-                    action_data = data
-                    success_call = True
-                    break
-                except Exception as e:
-                    print(f"DEBUG: {model_attempt} failed: {e}", file=sys.stderr)
-                    continue
+        for model_attempt in models_to_try:
+            try:
+                resp = client.chat.completions.create(
+                    model=model_attempt,
+                    messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}],
+                    timeout=30
+                )
+                content = resp.choices[0].message.content
+                if "```json" in content:
+                    content = content.split("```json")[1].split("```")[0]
+                data = json.loads(content)
+                if "assignments" in data:
+                    data["assignments"] = clean_assignments(data["assignments"], obs)
+                action_data = data
+                success_call = True
+                break
+            except Exception as e:
+                print(f"DEBUG: {model_attempt} failed: {e}")
+                continue
 
-            if not success_call: break
+        if not success_call: break
 
-            step_count += 1
+        step_count += 1
+        try:
             action = Action(**action_data)
             obs, reward_obj, done, info = env.step(action)
             rewards.append(reward_obj.value)
+            
+            # Extract scoring for visualization
+            scoring = action_data.get("score_breakdown", {})
+            score_str = f" [Score: {scoring}]" if scoring else ""
+            
             step_log = log_step(step=step_count, action=json.dumps(action_data), reward=reward_obj.value, done=done, error=info.get("last_action_error"))
-            log_history.append(step_log)
-            yield "\n".join(log_history)
-
-        state = env.state()
-        log_history.append(log_end(success=state.normalized_score >= 0.1, steps=step_count, score=state.normalized_score, rewards=rewards))
+            log_history.append(step_log + score_str)
+        except Exception as e:
+            done = True
+            log_history.append(f"Step {step_count} failed: {e}")
         yield "\n".join(log_history)
-    finally:
-        pass
+
+    state = env.state()
+    log_history.append(log_end(success=state.normalized_score >= 0.1, steps=step_count, score=state.normalized_score, rewards=rewards))
+    yield "\n".join(log_history)
 
 # --- CLI entry point ---
-def run_inference(task_id: str):
-    client, models_to_try = get_client_and_models()
-    if not client:
-        print("Error: No API key set. Set GROQ_API_KEY or HF_TOKEN.", file=sys.stderr)
-        return
-
-    env = ShopSchedulerEnv(task_id=task_id)
-    obs = env.reset()
-    log_start(task=task_id, env="shop_scheduler_env", model=models_to_try[0])
-
-    done, step_count, rewards = False, 0, []
-
-    try:
-        while not done and step_count < 25:
-            prompt = obs.model_dump_json()
-            success_call, action_dict = False, {}
-
-            for model_attempt in models_to_try:
-                try:
-                    resp = client.chat.completions.create(
-                        model=model_attempt,
-                        messages=[{"role": "system", "content": ELITE_PROMPT}, {"role": "user", "content": prompt}],
-                        timeout=30
-                    )
-                    content = resp.choices[0].message.content
-                    if "```json" in content:
-                        content = content.split("```json")[1].split("```")[0]
-                    data = json.loads(content)
-                    if "assignments" in data:
-                        data["assignments"] = clean_assignments(data["assignments"], obs)
-                    action_dict = data
-                    success_call = True
-                    break
-                except Exception as e:
-                    print(f"DEBUG: {model_attempt} failed: {e}", file=sys.stderr)
-                    continue
-
-            if not success_call: break
-
-            step_count += 1
-            action = Action(**action_dict)
-            obs, reward_obj, done, info = env.step(action)
-            rewards.append(reward_obj.value)
-            log_step(step=step_count, action=json.dumps(action_dict).replace(" ", ""), reward=reward_obj.value, done=done, error=info.get("last_action_error"))
-    finally:
-        state = env.state()
-        log_end(success=state.normalized_score >= 0.1, steps=step_count, score=state.normalized_score, rewards=rewards)
+def run_inference(task_id: str, strategy_mode: str = "Auto"):
+    # Reuse generator logic but print normally
+    for update in run_inference_generator(task_id, strategy_mode):
+        pass # The execution happens inside the generator
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--task_id", type=str, default="easy_single_machine")
-    run_inference(parser.parse_args().task_id)
+    parser.add_argument("--strategy", type=str, default="Auto", choices=["Auto", "Single Machine", "Multi-Machine", "Dynamic Arrivals"])
+    args = parser.parse_args()
+    run_inference(args.task_id, args.strategy)

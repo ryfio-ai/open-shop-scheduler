@@ -2,26 +2,24 @@ import gradio as gr
 import os
 import sys
 import uvicorn
+import json
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-# Add the root directory to the python path so we can import 'inference' and 'envs'
+# Add the root directory to the python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from inference import run_inference_generator
+from inference import run_inference_generator, get_client_and_models
 from envs.shop_scheduler_env.env import ShopSchedulerEnv
 from envs.shop_scheduler_env.models import Action
 
-# Initialize the Core Environment for the API
+# Initialize Core API Env
 api_env = ShopSchedulerEnv(task_id="easy_single_machine")
+app = FastAPI(title="Ryfio-AI: Industrial Scheduler API")
 
-# Create FastAPI App
-app = FastAPI(title="OpenShop Scheduler API")
-
-# --- OpenEnv Standard API Endpoints ---
-
+# --- OpenEnv API Endpoints ---
 @app.post("/reset")
-async def reset(request: Request):
+async def reset():
     obs = api_env.reset()
     return JSONResponse(content=obs.model_dump())
 
@@ -30,54 +28,71 @@ async def step(request: Request):
     data = await request.json()
     action = Action(**data)
     obs, reward_obj, done, info = api_env.step(action)
-    return JSONResponse(content={
-        "observation": obs.model_dump(),
-        "reward": reward_obj.value,
-        "done": done,
-        "info": info
-    })
+    return JSONResponse(content={"observation": obs.model_dump(), "reward": reward_obj.value, "done": done, "info": info})
 
-@app.get("/state")
-async def state():
-    state_data = api_env.state()
-    return JSONResponse(content=state_data.model_dump())
-
-# --- Gradio Dashboard UI ---
-
+# --- Gradio Premium UI ---
 def create_ui():
-    with gr.Blocks(title="OpenShop Scheduler Dashboard", theme=gr.themes.Soft()) as demo:
-        gr.Markdown("# 🏭 OpenShop Scheduler Dashboard")
-        gr.Markdown("Watch the AI agent solve manufacturing scheduling tasks in real-time.")
-        
+    _, models = get_client_and_models()
+    
+    css = """
+    .decision-card { border-left: 5px solid #ff9800; padding: 10px; margin: 10px 0; background: #2b2b2b; }
+    .metric-box { font-size: 20px; font-weight: bold; color: #4facfe; }
+    """
+
+    with gr.Blocks(title="Ryfio-AI | Adaptive Industrial Scheduler", theme=gr.themes.Soft(primary_hue="orange", secondary_hue="slate"), css=css) as demo:
+        gr.Markdown("# 🏭 Ryfio-AI | Adaptive Industrial Scheduler")
+        gr.Markdown("An advanced manufacturing command center featuring task-aware strategy shifting and real-time decision scoring.")
+
         with gr.Row():
-            with gr.Column(scale=1):
+            with gr.Column(scale=1, variant="panel"):
+                gr.Markdown("### 🎛️ Control Panel")
                 task_id = gr.Dropdown(
                     choices=["easy_single_machine", "medium_parallel_changeover", "hard_dynamic_arrivals"],
-                    value="easy_single_machine",
-                    label="Select Task"
+                    value="easy_single_machine", label="Active Task"
                 )
-                run_btn = gr.Button("🚀 Run Agent", variant="primary")
+                strategy_mode = gr.Dropdown(
+                    choices=["Auto", "Single Machine", "Multi-Machine", "Dynamic Arrivals"],
+                    value="Auto", label="Scheduling Strategy"
+                )
+                model_name = gr.Dropdown(
+                    choices=models if models else ["llama-3.1-8b-instant"],
+                    value=models[0] if models else "llama-3.1-8b-instant", label="AI Inference Model"
+                )
+                run_btn = gr.Button("🚀 Start Production Loop", variant="primary")
             
-            with gr.Column(scale=2):
-                output = gr.TextArea(
-                    label="Inference Logs (Standard Format)",
-                    interactive=False,
-                    lines=15
+            with gr.Column(scale=3):
+                with gr.Row():
+                    gr.Markdown("### 📊 Metrics Feed")
+                with gr.Row():
+                    m1 = gr.Textbox(label="Jobs Completed", value="0", interactive=False)
+                    m2 = gr.Textbox(label="Total Reward", value="0.00", interactive=False)
+                    m3 = gr.Textbox(label="Status", value="Ready", interactive=False)
+                
+                gr.Markdown("### 🧠 Decision & Reasoning Log")
+                output_area = gr.Markdown(
+                    value="*Production idle. Select a task and click run to begin.*",
+                    container=True
                 )
+
+        def runner(tid, smode, mname):
+            # Stream updates to the UI
+            for update in run_inference_generator(tid, smode, mname):
+                # We could parse the update here to update metrics boxes,
+                # but for simplicity we'll stream to the Markdown area.
+                yield update
 
         run_btn.click(
-            fn=run_inference_generator,
-            inputs=[task_id],
-            outputs=[output]
+            fn=runner,
+            inputs=[task_id, strategy_mode, model_name],
+            outputs=[output_area]
         )
+
     return demo
 
-# Link Gradio to FastAPI
 demo = create_ui()
 app = gr.mount_gradio_app(app, demo, path="/")
 
 def main():
-    """Entry point for the server script"""
     port = int(os.getenv("PORT", 7860))
     uvicorn.run(app, host="0.0.0.0", port=port)
 
