@@ -117,7 +117,7 @@ def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_ove
         models_to_try = [model_override] + models_to_try
     
     if not client:
-        yield {"logs": "Error: No API key set.", "completed": 0, "total_reward": 0.0, "status": "Error"}
+        yield {"logs": "Error: No API key set.", "completed": 0, "total_reward": 0.0, "status": "Error", "score": 0.0}
         return
 
     env = ShopSchedulerEnv(task_id=task_id)
@@ -131,7 +131,8 @@ def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_ove
         "logs": f"--- Strategy: {strategy} ---\n" + "\n".join(log_history),
         "completed": len(obs.completed_jobs),
         "total_reward": 0.0,
-        "status": "Starting"
+        "status": "Starting",
+        "score": 0.0
     }
 
     done, step_count, rewards = False, 0, []
@@ -177,11 +178,13 @@ def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_ove
             done = True
             log_history.append(f"Step {step_count} failed: {e}")
         
+        current_state = env.state()
         yield {
             "logs": "\n".join(log_history),
             "completed": len(obs.completed_jobs),
             "total_reward": round(sum(rewards), 2),
-            "status": "Finished" if done else "Processing"
+            "status": "Finished" if done else "Processing",
+            "score": current_state.normalized_score
         }
 
     state = env.state()
@@ -190,7 +193,8 @@ def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_ove
         "logs": "\n".join(log_history),
         "completed": len(obs.completed_jobs),
         "total_reward": round(sum(rewards), 2),
-        "status": "Completed"
+        "status": "Completed",
+        "score": state.normalized_score
     }
 
 # --- CLI entry point ---

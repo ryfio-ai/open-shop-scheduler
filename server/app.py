@@ -66,6 +66,7 @@ def create_ui():
                 with gr.Row():
                     m1 = gr.Textbox(label="Jobs Completed", value="0", interactive=False)
                     m2 = gr.Textbox(label="Total Reward", value="0.00", interactive=False)
+                    m4 = gr.Textbox(label="Official Score", value="0.000", interactive=False)
                     m3 = gr.Textbox(label="Status", value="Ready", interactive=False)
                 
                 gr.Markdown("### 🧠 Decision & Reasoning Log")
@@ -81,13 +82,14 @@ def create_ui():
                     update["logs"],
                     str(update["completed"]),
                     f"{update['total_reward']:.2f}",
-                    update["status"]
+                    update["status"],
+                    f"{update['score']:.3f}"
                 )
 
         run_btn.click(
             fn=runner,
             inputs=[task_id, strategy_mode, model_name],
-            outputs=[output_area, m1, m2, m3]
+            outputs=[output_area, m1, m2, m3, m4]
         )
 
     return demo
