@@ -92,8 +92,8 @@ def run_inference_generator(task_id: str):
             log_history.append(step_log)
             yield "\n".join(log_history)
 
-        score = sum(rewards) / 5.0 # Normalized score heuristic
-        score = min(max(score, 0.0), 1.0)
+        final_state = env.state()
+        score = final_state.normalized_score
         
         end_log = log_end(success=(score > 0.1), steps=step_count, score=score, rewards=rewards)
         log_history.append(end_log)
