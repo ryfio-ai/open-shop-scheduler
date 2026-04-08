@@ -1,31 +1,27 @@
-# Use a compatible Python image (Gradio 5 requires 3.10+)
+# Use a compatible Python image
 FROM python:3.10-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
-ENV PATH="/home/user/.local/bin:$PATH"
+ENV PORT=7860
 
-# Create a non-root user for security and HF compliance
+# Create a non-root user for HF compliance
 RUN useradd -m -u 1000 user
-
-# Set work directory
 WORKDIR /app
 
-# Install dependencies as root# Copy requirements and install
+# Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
-COPY . .
+# Copy the application and set ownership
+COPY --chown=user:user . .
 
-# Set environment variables for the OpenEnv validator
-ENV PYTHONUNBUFFERED=1
-ENV PORT=7860
+# Switch to non-root user
+USER user
 
-# Expose the port
+# Expose port
 EXPOSE 7860
 
-
-# Entry point for the Gradio dashboard
-CMD ["python", "app.py"]
+# Run using the new server structure
+CMD ["python", "server/app.py"]
