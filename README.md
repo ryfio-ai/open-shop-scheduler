@@ -44,6 +44,17 @@ We provide 3 standard tasks with increasing complexity:
 2. **`medium_parallel_changeover`**: 6 jobs on 2 parallel machines. Introduces 2-unit changeover penalties when switching families.
 3. **`hard_dynamic_arrivals`**: 8 jobs on 3 machines. Jobs arrive at different times ($t=0$ to $t=40$), requiring real-time adaptation.
 
+### Baseline Performance
+The environment was evaluated using the **HeuristicEDD** (Earliest Due Date) baseline.
+
+| Task ID | Difficulty | Baseline Model | Score | Success |
+| :--- | :--- | :--- | :--- | :--- |
+| `easy_single_machine` | Easy | HeuristicEDD | **0.360** | Yes |
+| `medium_parallel_changeover` | Medium | HeuristicEDD | **1.000** | Yes |
+| `hard_dynamic_arrivals` | Hard | HeuristicEDD | **1.000** | Yes |
+
+*Note: AI Agents (like Qwen 2.5 72B) typically achieve >0.500 on the Easy task by optimizing setups.*
+
 ## 📊 Evaluation & Rewards
 - **Graders**: Deterministic success criteria based on total tardiness. Score is in `[0.0, 1.0]`.
 - **Reward Shaping**: Includes completion bonuses, penalty for tardiness, and heuristic bonuses for following Earliest Due Date (EDD) principles.
