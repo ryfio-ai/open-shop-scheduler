@@ -14,9 +14,10 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 
 # Fallback model list to ensure reliability
 DEFAULT_MODELS = [
-    "meta-llama/Llama-3.2-3B-Instruct",
-    "google/gemma-2-9b-it",
     "mistralai/Mistral-7B-Instruct-v0.3",
+    "meta-llama/Meta-Llama-3-8B-Instruct",
+    "google/gemma-2-9b-it",
+    "HuggingFaceH4/zephyr-7b-beta",
     "Qwen/Qwen2.5-7B-Instruct"
 ]
 
