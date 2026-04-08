@@ -9,19 +9,16 @@ from envs.shop_scheduler_env.models import Action
 
 # --- API Configuration ---
 # Priority: GROQ_API_KEY -> HF_TOKEN
-# The code picks the first available provider automatically.
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
 def get_client_and_models():
     """Returns (OpenAI client, list of model IDs) based on available API keys."""
-    # Priority 1: Groq (free tier, very fast, reliable)
     if GROQ_API_KEY:
         client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=GROQ_API_KEY)
         models = ["llama-3.1-8b-instant", "gemma2-9b-it", "mixtral-8x7b-32768"]
         return client, models
 
-    # Priority 2: HF Router (may have quota issues)
     if HF_TOKEN:
         base = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
         client = OpenAI(base_url=base, api_key=HF_TOKEN)
@@ -58,15 +55,34 @@ ELITE_PROMPT = (
     "4. LEAST PENALTY SWITCH: If no family match exists, choose a job that minimizes future penalties (due dates & priority).\n\n"
     "CRITICAL SCHEMA RULES:\n"
     "- Respond ONLY with a valid JSON object.\n"
-    "- 'assignments' must contain ONLY valid {machine_id, job_id} objects. NO COMMENTS OR STRINGS inside the list.\n"
-    "- If you have nothing to assign for a machine, do not list it or use job_id: null.\n\n"
-    "JSON Format example:\n"
-    '{"assignments": [{"machine_id": "M1", "job_id": "J1"}], "reasoning": "Reasoning here."}'
+    "- 'assignments' must contain ONLY valid {machine_id, job_id} objects for machines that are CURRENTLY 'idle'.\n"
+    "- NO COMMENTS OR STRINGS inside the list.\n"
+    "- If you have nothing to assign for a machine, do not list it.\n"
 )
 
-def clean_assignments(assignments: list) -> list:
-    """Prunes non-dict garbage from the model output to prevent Pydantic crashes."""
-    return [a for a in assignments if isinstance(a, dict) and "machine_id" in a]
+def clean_assignments(assignments: list, obs) -> list:
+    """Prunes invalid and duplicate assignments before they hit the environment."""
+    valid_assignments = []
+    seen_machines = set()
+    seen_jobs = set()
+    
+    pending_job_ids = {job.job_id for job in obs.jobs_pending}
+    idle_machine_ids = {m.machine_id for m in obs.machines if m.state == "idle"}
+
+    for a in assignments:
+        if not isinstance(a, dict): continue
+        m_id = a.get("machine_id")
+        j_id = a.get("job_id")
+        
+        if m_id not in idle_machine_ids: continue
+        if m_id in seen_machines or j_id in seen_jobs: continue
+        if j_id not in pending_job_ids: continue
+        
+        valid_assignments.append({"machine_id": m_id, "job_id": j_id})
+        seen_machines.add(m_id)
+        seen_jobs.add(j_id)
+        
+    return valid_assignments
 
 # --- Gradio streaming generator ---
 def run_inference_generator(task_id: str):
@@ -101,17 +117,13 @@ def run_inference_generator(task_id: str):
                 try:
                     response = client.chat.completions.create(
                         model=model_attempt,
-                        messages=[
-                            {"role": "system", "content": ELITE_PROMPT},
-                            {"role": "user", "content": prompt}
-                        ],
+                        messages=[{"role": "system", "content": ELITE_PROMPT}, {"role": "user", "content": prompt}],
                         response_format={"type": "json_object"},
                         timeout=30
                     )
                     action_data = json.loads(response.choices[0].message.content)
-                    # Defense: Clean the assignments before validation
                     if "assignments" in action_data:
-                        action_data["assignments"] = clean_assignments(action_data["assignments"])
+                        action_data["assignments"] = clean_assignments(action_data["assignments"], obs)
                     
                     current_model = model_attempt
                     success_call = True
@@ -120,11 +132,9 @@ def run_inference_generator(task_id: str):
                     error_msg = str(e)
                     if any(code in error_msg for code in ["402", "429", "not_supported", "not supported"]):
                         continue
-                    else:
-                        break
+                    break
 
             if not success_call:
-                reward = 0.0
                 done = True
             else:
                 try:
@@ -132,14 +142,13 @@ def run_inference_generator(task_id: str):
                     obs, reward_obj, done, info = env.step(action)
                     reward = reward_obj.value
                     error_msg = info.get("last_action_error")
+                    rewards.append(reward)
+                    step_log = log_step(step=step_count, action=json.dumps(action_data), reward=reward, done=done, error=error_msg)
+                    log_history.append(step_log)
                 except Exception as e:
-                    reward = 0.0
                     done = True
                     error_msg = f"Validation Error: {str(e)}"
-
-            rewards.append(reward)
-            step_log = log_step(step=step_count, action=json.dumps(action_data), reward=reward, done=done, error=error_msg)
-            log_history.append(step_log)
+                    log_history.append(f"Step {step_count} failed: {error_msg}")
             yield "\n".join(log_history)
 
         final_state = env.state()
@@ -159,7 +168,6 @@ def run_inference(task_id: str):
 
     env = ShopSchedulerEnv(task_id=task_id)
     obs = env.reset()
-
     log_start(task=task_id, env="shop_scheduler_env", model=models_to_try[0])
 
     done = False
@@ -167,12 +175,11 @@ def run_inference(task_id: str):
     rewards = []
 
     try:
-        while not done:
+        while not done and step_count < 25:
             step_count += 1
             prompt = obs.model_dump_json()
             success_call = False
             action_dict = {}
-            error = None
 
             for model_attempt in models_to_try:
                 try:
@@ -181,14 +188,14 @@ def run_inference(task_id: str):
                         messages=[{"role": "system", "content": ELITE_PROMPT}, {"role": "user", "content": prompt}],
                         response_format={"type": "json_object"}
                     )
-                    action_dict = json.loads(response.choices[0].message.content)
+                    action_data = json.loads(response.choices[0].message.content)
+                    if "assignments" in action_data:
+                        action_data["assignments"] = clean_assignments(action_data["assignments"], obs)
+                    action_dict = action_data
                     success_call = True
                     break
-                except Exception as e:
-                    if "402" in str(e) or "429" in str(e) or "not_supported" in str(e):
-                        continue
-                    error = str(e)
-                    break
+                except Exception:
+                    continue
 
             if not success_call:
                 break
@@ -198,9 +205,6 @@ def run_inference(task_id: str):
             reward = reward_obj.value
             rewards.append(reward)
             log_step(step=step_count, action=json.dumps(action_dict).replace(" ", ""), reward=reward, done=done, error=info.get("last_action_error"))
-
-            if step_count >= 20:
-                break
     finally:
         final_state = env.state()
         log_end(success=final_state.normalized_score >= 0.1, steps=step_count, score=final_state.normalized_score, rewards=rewards)
@@ -208,5 +212,4 @@ def run_inference(task_id: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--task_id", type=str, default="easy_single_machine")
-    args = parser.parse_args()
-    run_inference(args.task_id)
+    run_inference(parser.parse_args().task_id)
