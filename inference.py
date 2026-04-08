@@ -54,14 +54,19 @@ ELITE_PROMPT = (
     "You are an ELITE manufacturing scheduler. Your goal is a 1.000 score by following this STRATEGIC HIERARCHY:\n\n"
     "1. RUSH JOBS FIRST: Identify all 'rush' jobs in 'jobs_pending'. Assign them immediately to any idle machines.\n"
     "2. FAMILY MATCH: For remaining idle machines, prioritize jobs that match the machine's 'current_family' to avoid the 2-unit setup penalty.\n"
-    "3. NO IDLE MACHINES: You must use ALL available machines (M1, M2, M3). If a machine is idle and a job is pending, assign it. Do not be lazy!\n"
-    "4. LEAST PENALTY SWITCH: If no family match exists, choose a job that minimizes future penalties or pick the highest priority.\n\n"
-    "CRITICAL CONSTRAINTS:\n"
-    "- Only assign jobs where current_time >= arrival_time.\n"
-    "- A 2-unit setup penalty is incurred if the job family != machine current_family.\n\n"
-    "Respond with a JSON object:\n"
-    '{"assignments": [{"machine_id": "M1", "job_id": "J1"}, {"machine_id": "M2", "job_id": "J2"}], "reasoning": "Reasoning here."}'
+    "3. NO IDLE MACHINES: You must use ALL available machines. If a machine is idle and a job is pending, assign it. Do not be lazy!\n"
+    "4. LEAST PENALTY SWITCH: If no family match exists, choose a job that minimizes future penalties (due dates & priority).\n\n"
+    "CRITICAL SCHEMA RULES:\n"
+    "- Respond ONLY with a valid JSON object.\n"
+    "- 'assignments' must contain ONLY valid {machine_id, job_id} objects. NO COMMENTS OR STRINGS inside the list.\n"
+    "- If you have nothing to assign for a machine, do not list it or use job_id: null.\n\n"
+    "JSON Format example:\n"
+    '{"assignments": [{"machine_id": "M1", "job_id": "J1"}], "reasoning": "Reasoning here."}'
 )
+
+def clean_assignments(assignments: list) -> list:
+    """Prunes non-dict garbage from the model output to prevent Pydantic crashes."""
+    return [a for a in assignments if isinstance(a, dict) and "machine_id" in a]
 
 # --- Gradio streaming generator ---
 def run_inference_generator(task_id: str):
@@ -84,7 +89,7 @@ def run_inference_generator(task_id: str):
     rewards = []
 
     try:
-        while not done and step_count < 15:
+        while not done and step_count < 25:
             step_count += 1
             prompt = f"Current state: {obs.model_dump_json()}"
 
@@ -104,12 +109,16 @@ def run_inference_generator(task_id: str):
                         timeout=30
                     )
                     action_data = json.loads(response.choices[0].message.content)
+                    # Defense: Clean the assignments before validation
+                    if "assignments" in action_data:
+                        action_data["assignments"] = clean_assignments(action_data["assignments"])
+                    
                     current_model = model_attempt
                     success_call = True
                     break
                 except Exception as e:
                     error_msg = str(e)
-                    if "402" in error_msg or "429" in error_msg or "not_supported" in error_msg or "not supported" in error_msg:
+                    if any(code in error_msg for code in ["402", "429", "not_supported", "not supported"]):
                         continue
                     else:
                         break
@@ -122,11 +131,11 @@ def run_inference_generator(task_id: str):
                     action = Action(**action_data)
                     obs, reward_obj, done, info = env.step(action)
                     reward = reward_obj.value
-                    error_msg = None
+                    error_msg = info.get("last_action_error")
                 except Exception as e:
                     reward = 0.0
                     done = True
-                    error_msg = str(e)
+                    error_msg = f"Validation Error: {str(e)}"
 
             rewards.append(reward)
             step_log = log_step(step=step_count, action=json.dumps(action_data), reward=reward, done=done, error=error_msg)
