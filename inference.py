@@ -14,10 +14,10 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 
 # Fallback model list to ensure reliability
 DEFAULT_MODELS = [
-    "mistralai/Mistral-7B-Instruct-v0.3",
-    "meta-llama/Meta-Llama-3-8B-Instruct",
+    "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "mistralai/Mistral-7B-Instruct-v0.2",
     "google/gemma-2-9b-it",
-    "HuggingFaceH4/zephyr-7b-beta",
+    "deepseek-ai/deepseek-coder-33b-instruct",
     "Qwen/Qwen2.5-7B-Instruct"
 ]
 
