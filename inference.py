@@ -33,16 +33,20 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
     return line
 
 def run_inference_generator(task_id: str):
-    """Generator version for Gradio streaming"""
+    """Generator version for Gradio streaming that yields the full history."""
     if not HF_TOKEN:
         yield "Error: HF_TOKEN environment variable is not set."
         return
+
+    log_history = []
 
     client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     env = ShopSchedulerEnv(task_id=task_id)
     obs = env.reset()
 
-    yield log_start(task=task_id, env="shop_scheduler_env", model=MODEL_NAME)
+    start_log = log_start(task=task_id, env="shop_scheduler_env", model=MODEL_NAME)
+    log_history.append(start_log)
+    yield "\n".join(log_history)
 
     done = False
     step_count = 0
@@ -58,24 +62,45 @@ def run_inference_generator(task_id: str):
     )
 
     try:
-        while not done:
+        while not done and step_count < 15:
             step_count += 1
-            messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": obs.model_dump_json()}]
-            response = client.chat.completions.create(model=MODEL_NAME, messages=messages, response_format={"type": "json_object"})
-            action_content = response.choices[0].message.content
-            action_dict = json.loads(action_content)
-            action = Action(**action_dict)
-            obs, reward_obj, done, info = env.step(action)
-            reward = reward_obj.value
+            prompt = f"Current state: {obs.model_dump_json()}"
+            
+            try:
+                response = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"}
+                )
+                action_data = json.loads(response.choices[0].message.content)
+                action = Action(**action_data)
+                
+                obs, reward_obj, done, info = env.step(action)
+                reward = reward_obj.value
+                error_msg = None
+            except Exception as e:
+                reward = 0.0
+                done = True
+                error_msg = str(e)
+                action_data = {}
+
             rewards.append(reward)
-            action_str = json.dumps(action_dict).replace(" ", "")
-            yield log_step(step=step_count, action=action_str, reward=reward, done=done, error=info.get("last_action_error"))
-            if step_count >= 20: break
-    except Exception as e:
-        yield f"[DEBUG] Error: {str(e)}"
+            step_log = log_step(step=step_count, action=json.dumps(action_data), reward=reward, done=done, error=error_msg)
+            log_history.append(step_log)
+            yield "\n".join(log_history)
+
+        score = sum(rewards) / 5.0 # Normalized score heuristic
+        score = min(max(score, 0.0), 1.0)
+        
+        end_log = log_end(success=(score > 0.1), steps=step_count, score=score, rewards=rewards)
+        log_history.append(end_log)
+        yield "\n".join(log_history)
+
     finally:
-        final_state = env.state()
-        yield log_end(success=final_state.normalized_score >= 0.1, steps=step_count, score=final_state.normalized_score, rewards=rewards)
+        pass
 
 def run_inference(task_id: str):
     if not HF_TOKEN:
