@@ -2,7 +2,7 @@ import os
 import json
 import argparse
 import sys
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from openai import OpenAI
 from envs.shop_scheduler_env.env import ShopSchedulerEnv
 from envs.shop_scheduler_env.models import Action
@@ -117,7 +117,7 @@ def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_ove
         models_to_try = [model_override] + models_to_try
     
     if not client:
-        yield "Error: No API key set. Please set GROQ_API_KEY or HF_TOKEN."
+        yield {"logs": "Error: No API key set.", "completed": 0, "total_reward": 0.0, "status": "Error"}
         return
 
     env = ShopSchedulerEnv(task_id=task_id)
@@ -127,7 +127,12 @@ def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_ove
     system_prompt = get_system_prompt(strategy)
     
     log_history = [log_start(task=task_id, env="shop_scheduler_env", model=models_to_try[0])]
-    yield f"--- Strategy: {strategy} ---\n" + "\n".join(log_history)
+    yield {
+        "logs": f"--- Strategy: {strategy} ---\n" + "\n".join(log_history),
+        "completed": len(obs.completed_jobs),
+        "total_reward": 0.0,
+        "status": "Starting"
+    }
 
     done, step_count, rewards = False, 0, []
 
@@ -163,7 +168,6 @@ def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_ove
             obs, reward_obj, done, info = env.step(action)
             rewards.append(reward_obj.value)
             
-            # Extract scoring for visualization
             scoring = action_data.get("score_breakdown", {})
             score_str = f" [Score: {scoring}]" if scoring else ""
             
@@ -172,17 +176,27 @@ def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_ove
         except Exception as e:
             done = True
             log_history.append(f"Step {step_count} failed: {e}")
-        yield "\n".join(log_history)
+        
+        yield {
+            "logs": "\n".join(log_history),
+            "completed": len(obs.completed_jobs),
+            "total_reward": round(sum(rewards), 2),
+            "status": "Finished" if done else "Processing"
+        }
 
     state = env.state()
     log_history.append(log_end(success=state.normalized_score >= 0.1, steps=step_count, score=state.normalized_score, rewards=rewards))
-    yield "\n".join(log_history)
+    yield {
+        "logs": "\n".join(log_history),
+        "completed": len(obs.completed_jobs),
+        "total_reward": round(sum(rewards), 2),
+        "status": "Completed"
+    }
 
 # --- CLI entry point ---
 def run_inference(task_id: str, strategy_mode: str = "Auto"):
-    # Reuse generator logic but print normally
     for update in run_inference_generator(task_id, strategy_mode):
-        pass # The execution happens inside the generator
+        pass
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

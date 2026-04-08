@@ -75,16 +75,19 @@ def create_ui():
                 )
 
         def runner(tid, smode, mname):
-            # Stream updates to the UI
             for update in run_inference_generator(tid, smode, mname):
-                # We could parse the update here to update metrics boxes,
-                # but for simplicity we'll stream to the Markdown area.
-                yield update
+                # Map the structured update to the multiple UI outputs
+                yield (
+                    update["logs"],
+                    str(update["completed"]),
+                    f"{update['total_reward']:.2f}",
+                    update["status"]
+                )
 
         run_btn.click(
             fn=runner,
             inputs=[task_id, strategy_mode, model_name],
-            outputs=[output_area]
+            outputs=[output_area, m1, m2, m3]
         )
 
     return demo
