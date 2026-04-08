@@ -7,6 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from envs.shop_scheduler_env.env import ShopSchedulerEnv
 from envs.shop_scheduler_env.models import Action, MachineAssignment
+from inference import log_start, log_step, log_end
 
 def heuristic_agent(obs):
     if not obs.jobs_pending:
@@ -29,22 +30,23 @@ def verify_task(task_id):
     env = ShopSchedulerEnv(task_id=task_id)
     obs = env.reset()
     
-    print(f"[START] task={task_id}")
+    log_start(task=task_id, env="shop_scheduler_env", model="HeuristicEDD")
     
     done = False
     step = 0
+    rewards = []
     while not done:
         step += 1
         action = heuristic_agent(obs)
-        obs, reward, done, info = env.step(action)
+        obs, reward_obj, done, info = env.step(action)
+        reward = reward_obj.value
+        rewards.append(reward)
         
-        # Verify STEP format
         action_str = action.model_dump_json().replace(" ", "")
-        error_str = info.get("last_action_error") or "null"
-        print(f"[STEP] step={step} action={action_str} reward={reward.value:.2f} done={str(done).lower()} error={error_str}")
+        log_step(step=step, action=action_str, reward=reward, done=done, error=info.get("last_action_error"))
         
     final_state = env.state()
-    print(f"[END] score={final_state.normalized_score:.4f}")
+    log_end(success=final_state.normalized_score >= 0.1, steps=step, score=final_state.normalized_score, rewards=rewards)
     print("----------------------------\n")
 
 if __name__ == "__main__":

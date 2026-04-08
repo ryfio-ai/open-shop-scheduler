@@ -6,13 +6,47 @@ colorTo: indigo
 sdk: docker
 app_port: 7860
 pinned: true
+tags:
+  - openenv
+  - manufacturing
+  - scheduling
 ---
 
 # OpenShop Scheduler (OpenEnv)
 
-A manufacturing shop-floor scheduling environment built for the **OpenEnv** benchmark standard. This repo provides a verifiable environment for training and evaluating AI agents on production scheduling tasks.
+## 🎯 Environment Motivation
+Manufacturing production scheduling is a high-stakes, real-world task where AI agents can drive significant efficiency. In a "Job Shop" or "Open Shop" setting, agents must allocate limited machine resources to competing jobs while minimizing **tardiness** (delay beyond due dates) and managing **setup costs** (time lost when switching job families). 
 
-## Quick Start
+Unlike simple games, this environment models the complexities of factory throughput, including dynamic job arrivals and family-based changeover penalties.
+
+## 🕹️ Observation Space
+The `Observation` is a Pydantic model containing:
+- `task_id`: Current task identifier.
+- `current_time`: The global clock (units of time).
+- `machines`: List of `MachineSnapshot` (status, current job, family, time remaining).
+- `jobs_pending`: List of `JobSnapshot` for jobs that have arrived and are ready for assignment.
+- `jobs_in_progress`: Jobs currently being processed.
+- `completed_jobs`: History of finished tasks with completion times.
+- `last_action_error`: Feedback if the previous step was invalid.
+
+## 🛠️ Action Space
+The `Action` is a Pydantic model:
+- `assignments`: List of `MachineAssignment` objects.
+  - `machine_id`: The machine to assign work to.
+  - `job_id`: The job to start (must be in `jobs_pending`).
+- `reasoning`: A string field for the agent to explain its scheduling logic.
+
+## 🏆 Tasks & Difficulty
+We provide 3 standard tasks with increasing complexity:
+1. **`easy_single_machine`**: 5 jobs on 1 machine. Focuses on basic sequencing.
+2. **`medium_parallel_changeover`**: 6 jobs on 2 parallel machines. Introduces 2-unit changeover penalties when switching families.
+3. **`hard_dynamic_arrivals`**: 8 jobs on 3 machines. Jobs arrive at different times ($t=0$ to $t=40$), requiring real-time adaptation.
+
+## 📊 Evaluation & Rewards
+- **Graders**: Deterministic success criteria based on total tardiness. Score is in `[0.0, 1.0]`.
+- **Reward Shaping**: Includes completion bonuses, penalty for tardiness, and heuristic bonuses for following Earliest Due Date (EDD) principles.
+
+## 🔧 Setup & Usage
 
 ### Prerequisites
 - Python 3.9+
