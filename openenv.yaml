@@ -3,7 +3,7 @@ version: 1.0.0
 description: "A manufacturing production scheduling environment for agentic evaluation."
 domain: manufacturing
 standard: "OpenEnv v1.0"
-publisher: "Antigravity Scheduler Team"
+publisher: "TEAM RYFIO"
 
 tasks:
   - id: easy_single_machine
@@ -22,4 +22,4 @@ tasks:
 app:
   port: 7860
   runtime: python
-  entrypoint: app.py
+  entrypoint: server/app.py

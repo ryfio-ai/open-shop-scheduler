@@ -1,17 +1,16 @@
 import gradio as gr
 import os
-import json
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from inference import run_inference_generator
 from envs.shop_scheduler_env.env import ShopSchedulerEnv
 from envs.shop_scheduler_env.models import Action
 
-# 1. Initialize the Core Environment for the API
-# By default, use the easy task for the automated pings
+# Initialize the Core Environment for the API
 api_env = ShopSchedulerEnv(task_id="easy_single_machine")
 
-# 2. Create FastAPI App
+# Create FastAPI App
 app = FastAPI(title="OpenShop Scheduler API")
 
 # --- OpenEnv Standard API Endpoints ---
@@ -68,13 +67,14 @@ def create_ui():
         )
     return demo
 
-# 3. Mount Gradio to FastAPI
-# We mount it at "/" so the human-friendly UI is the first thing people see,
-# but FastAPI will handle the /reset, /step, /state routes first.
+# Link Gradio to FastAPI
 demo = create_ui()
 app = gr.mount_gradio_app(app, demo, path="/")
 
-# For local running
+def main():
+    """Entry point for the server script"""
+    port = int(os.getenv("PORT", 7860))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+    main()

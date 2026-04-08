@@ -12,21 +12,20 @@ RUN useradd -m -u 1000 user
 # Set work directory
 WORKDIR /app
 
-# Install dependencies as root for caching
-COPY --chown=user:user requirements.txt .
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
-
-# Switch to the non-root user
-USER user
+# Install dependencies as root# Copy requirements and install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application
-COPY --chown=user:user . .
+COPY . .
 
-# Expose the standard HF port
+# Set environment variables for the OpenEnv validator
+ENV PYTHONUNBUFFERED=1
+ENV PORT=7860
+
+# Expose the port
 EXPOSE 7860
 
-# Ensure inference script is executable
-RUN chmod +x inference.py
 
 # Entry point for the Gradio dashboard
 CMD ["python", "app.py"]

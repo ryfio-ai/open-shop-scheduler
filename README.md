@@ -15,6 +15,7 @@ tags:
 ---
 
 # OpenShop Scheduler (OpenEnv)
+**Built by TEAM RYFIO for the Meta PyTorch OpenEnv Hackathon**
 
 ## 🎯 Environment Motivation
 Manufacturing production scheduling is a high-stakes, real-world task where AI agents can drive significant efficiency. In a "Job Shop" or "Open Shop" setting, agents must allocate limited machine resources to competing jobs while minimizing **tardiness** (delay beyond due dates) and managing **setup costs** (time lost when switching job families). 
