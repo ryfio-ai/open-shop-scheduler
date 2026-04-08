@@ -32,6 +32,23 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
     print(line, flush=True)
     return line
 
+# --- ELITE AGENT PROMPT ---
+ELITE_PROMPT = (
+    "You are an ELITE manufacturing scheduler. Your goal is to achieve a 1.000 score by minimizing tardiness.\n\n"
+    "CORE RULES:\n"
+    "1. PENALTY COST: Switching families (e.g., A -> B) costs 2 full units. This is a MASSIVE penalty. Avoid it at all costs.\n"
+    "2. FAMILY BATCHING: If a machine just finished a Family A job, you MUST assign another Family A job to it if any are pending. This is your top priority.\n"
+    "3. RUSH JOBS: Jobs marked 'rush' are critical. Process them immediately, but still try to use a machine already in that family if possible.\n"
+    "4. IDLE MACHINES: A machine is 'idle' if its current job is null. Use idle machines immediately to keep the factory moving.\n"
+    "5. DYNAMIC ARRIVALS: Watch the 'arrival_time'. You cannot assign a job before its arrival time.\n\n"
+    "THINKING PROCESS:\n"
+    "- Step 1: Look at each machine. Is it idle?\n"
+    "- Step 2: For each idle machine, what was its last family? Search 'jobs_pending' for jobs with THAT SAME family.\n"
+    "- Step 3: If no same-family jobs exist, pick the highest priority job from another family.\n\n"
+    "Respond with a JSON object following the Action schema:\n"
+    '{"assignments": [{"machine_id": "M1", "job_id": "J1"}], "reasoning": "Batching Family A to avoid 2-unit penalty."}'
+)
+
 def run_inference_generator(task_id: str):
     """Generator version for Gradio streaming that yields the full history."""
     if not HF_TOKEN:
@@ -51,15 +68,6 @@ def run_inference_generator(task_id: str):
     done = False
     step_count = 0
     rewards = []
-    system_prompt = (
-        "You are an expert manufacturing scheduler. Your goal is to assign jobs to machines to minimize tardiness. "
-        "Domain knowledge: Changing job families on a machine incurs a setup time penalty of 2 units. "
-        "Observe 'arrival_time' for dynamic jobs. "
-        "CRITICAL: Only assign jobs that are currently in the 'jobs_pending' list. Once a job is assigned to a machine, "
-        "it is no longer pending and cannot be assigned again. "
-        "Respond with a JSON object following the Action schema: "
-        '{"assignments": [{"machine_id": "M1", "job_id": "J1"}], "reasoning": "..."}'
-    )
 
     try:
         while not done and step_count < 15:
@@ -70,7 +78,7 @@ def run_inference_generator(task_id: str):
                 response = client.chat.completions.create(
                     model=MODEL_NAME,
                     messages=[
-                        {"role": "system", "content": system_prompt},
+                        {"role": "system", "content": ELITE_PROMPT},
                         {"role": "user", "content": prompt}
                     ],
                     response_format={"type": "json_object"}
@@ -121,22 +129,12 @@ def run_inference(task_id: str):
     step_count = 0
     rewards = []
     
-    system_prompt = (
-        "You are an expert manufacturing scheduler. Your goal is to assign jobs to machines to minimize tardiness. "
-        "Domain knowledge: Changing job families on a machine incurs a setup time penalty of 2 units. "
-        "Observe 'arrival_time' for dynamic jobs. "
-        "CRITICAL: Only assign jobs that are currently in the 'jobs_pending' list. Once a job is assigned to a machine, "
-        "it is no longer pending and cannot be assigned again. "
-        "Respond with a JSON object following the Action schema: "
-        '{"assignments": [{"machine_id": "M1", "job_id": "J1"}], "reasoning": "..."}'
-    )
-
     try:
         while not done:
             step_count += 1
             
             messages = [
-                {"role": "system", "content": system_prompt},
+                {"role": "system", "content": ELITE_PROMPT},
                 {"role": "user", "content": obs.model_dump_json()}
             ]
 
