@@ -34,19 +34,16 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
 
 # --- ELITE AGENT PROMPT ---
 ELITE_PROMPT = (
-    "You are an ELITE manufacturing scheduler. Your goal is to achieve a 1.000 score by minimizing tardiness.\n\n"
-    "CORE RULES:\n"
-    "1. PENALTY COST: Switching families (e.g., A -> B) costs 2 full units. This is a MASSIVE penalty. Avoid it at all costs.\n"
-    "2. FAMILY BATCHING: If a machine just finished a Family A job, you MUST assign another Family A job to it if any are pending. This is your top priority.\n"
-    "3. RUSH JOBS: Jobs marked 'rush' are critical. Process them immediately, but still try to use a machine already in that family if possible.\n"
-    "4. IDLE MACHINES: A machine is 'idle' if its current job is null. Use idle machines immediately to keep the factory moving.\n"
-    "5. DYNAMIC ARRIVALS: Watch the 'arrival_time'. You cannot assign a job before its arrival time.\n\n"
-    "THINKING PROCESS:\n"
-    "- Step 1: Look at each machine. Is it idle?\n"
-    "- Step 2: For each idle machine, what was its last family? Search 'jobs_pending' for jobs with THAT SAME family.\n"
-    "- Step 3: If no same-family jobs exist, pick the highest priority job from another family.\n\n"
-    "Respond with a JSON object following the Action schema:\n"
-    '{"assignments": [{"machine_id": "M1", "job_id": "J1"}], "reasoning": "Batching Family A to avoid 2-unit penalty."}'
+    "You are an ELITE manufacturing scheduler. Your goal is a 1.000 score by following this STRATEGIC HIERARCHY:\n\n"
+    "1. RUSH JOBS FIRST: Identify all 'rush' jobs in 'jobs_pending'. Assign them immediately to any idle machines.\n"
+    "2. FAMILY MATCH: For remaining idle machines, prioritize jobs that match the machine's 'current_family' to avoid the 2-unit setup penalty.\n"
+    "3. NO IDLE MACHINES: You must use ALL available machines (M1, M2, M3). If a machine is idle and a job is pending, assign it. Do not be lazy!\n"
+    "4. LEAST PENALTY SWITCH: If no family match exists, chose a job that minimizes future penalties or pick the highest priority.\n\n"
+    "CRITICAL CONSTRAINTS:\n"
+    "- Only assign jobs where current_time >= arrival_time.\n"
+    "- A 2-unit setup penalty is incurred if the job family != machine current_family.\n\n"
+    "Respond with a JSON object:\n"
+    '{"assignments": [{"machine_id": "M1", "job_id": "J1"}, {"machine_id": "M2", "job_id": "J2"}], "reasoning": "1. J1 (Rush) assigned. 2. J2 matches M2 family. 3. M3 filled to avoid idle."}'
 )
 
 def run_inference_generator(task_id: str):
