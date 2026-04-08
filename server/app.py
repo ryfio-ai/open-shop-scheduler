@@ -1,8 +1,13 @@
 import gradio as gr
 import os
+import sys
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+
+# Add the root directory to the python path so we can import 'inference' and 'envs'
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from inference import run_inference_generator
 from envs.shop_scheduler_env.env import ShopSchedulerEnv
 from envs.shop_scheduler_env.models import Action
