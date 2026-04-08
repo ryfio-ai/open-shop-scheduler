@@ -1,0 +1,53 @@
+{
+  "scenario_name": "single_machine_shift_a",
+  "task_id": "easy_single_machine",
+  "description": "Sequence five jobs on one CNC machine to minimize tardiness.",
+  "max_time": 40,
+  "max_steps": 8,
+  "machines": [
+    {
+      "machine_id": "M1",
+      "status": "idle",
+      "current_job_id": null,
+      "family": null,
+      "time_remaining": 0
+    }
+  ],
+  "jobs": [
+    {
+      "job_id": "J1",
+      "family": "A",
+      "processing_time": 6,
+      "due_time": 10,
+      "priority": "medium"
+    },
+    {
+      "job_id": "J2",
+      "family": "A",
+      "processing_time": 4,
+      "due_time": 8,
+      "priority": "high"
+    },
+    {
+      "job_id": "J3",
+      "family": "B",
+      "processing_time": 7,
+      "due_time": 18,
+      "priority": "medium"
+    },
+    {
+      "job_id": "J4",
+      "family": "C",
+      "processing_time": 5,
+      "due_time": 14,
+      "priority": "low"
+    },
+    {
+      "job_id": "J5",
+      "family": "B",
+      "processing_time": 3,
+      "due_time": 9,
+      "priority": "high"
+    }
+  ]
+}

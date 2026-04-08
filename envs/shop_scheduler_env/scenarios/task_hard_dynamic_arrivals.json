@@ -1,0 +1,96 @@
+{
+  "scenario_name": "dynamic_arrival_chaos",
+  "task_id": "hard_dynamic_arrivals",
+  "description": "Jobs arrive at different times. Adapting the schedule to late-arriving priority jobs is key.",
+  "max_time": 100,
+  "max_steps": 20,
+  "machines": [
+    {
+      "machine_id": "M1",
+      "status": "idle",
+      "current_job_id": null,
+      "family": null,
+      "time_remaining": 0
+    },
+    {
+      "machine_id": "M2",
+      "status": "idle",
+      "current_job_id": null,
+      "family": null,
+      "time_remaining": 0
+    },
+    {
+      "machine_id": "M3",
+      "status": "idle",
+      "current_job_id": null,
+      "family": null,
+      "time_remaining": 0
+    }
+  ],
+  "jobs": [
+    {
+      "job_id": "J1",
+      "family": "A",
+      "processing_time": 10,
+      "due_time": 30,
+      "priority": "medium",
+      "arrival_time": 0
+    },
+    {
+      "job_id": "J2",
+      "family": "B",
+      "processing_time": 8,
+      "due_time": 25,
+      "priority": "high",
+      "arrival_time": 0
+    },
+    {
+      "job_id": "J3",
+      "family": "A",
+      "processing_time": 12,
+      "due_time": 40,
+      "priority": "medium",
+      "arrival_time": 10
+    },
+    {
+      "job_id": "J4",
+      "family": "C",
+      "processing_time": 20,
+      "due_time": 50,
+      "priority": "low",
+      "arrival_time": 15
+    },
+    {
+      "job_id": "J5",
+      "family": "B",
+      "processing_time": 6,
+      "due_time": 45,
+      "priority": "high",
+      "arrival_time": 20
+    },
+    {
+      "job_id": "J6",
+      "family": "A",
+      "processing_time": 7,
+      "due_time": 55,
+      "priority": "rush",
+      "arrival_time": 25
+    },
+    {
+      "job_id": "J7",
+      "family": "C",
+      "processing_time": 15,
+      "due_time": 70,
+      "priority": "medium",
+      "arrival_time": 30
+    },
+    {
+      "job_id": "J8",
+      "family": "B",
+      "processing_time": 10,
+      "due_time": 80,
+      "priority": "low",
+      "arrival_time": 40
+    }
+  ]
+}

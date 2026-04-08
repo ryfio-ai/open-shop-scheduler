@@ -1,0 +1,67 @@
+{
+  "scenario_name": "parallel_changeover_baseline",
+  "task_id": "medium_parallel_changeover",
+  "description": "Two machines with family-based setup times. Optimize for parallel throughput.",
+  "max_time": 60,
+  "max_steps": 12,
+  "machines": [
+    {
+      "machine_id": "M1",
+      "status": "idle",
+      "current_job_id": null,
+      "family": null,
+      "time_remaining": 0
+    },
+    {
+      "machine_id": "M2",
+      "status": "idle",
+      "current_job_id": null,
+      "family": null,
+      "time_remaining": 0
+    }
+  ],
+  "jobs": [
+    {
+      "job_id": "J1",
+      "family": "A",
+      "processing_time": 8,
+      "due_time": 15,
+      "priority": "medium"
+    },
+    {
+      "job_id": "J2",
+      "family": "B",
+      "processing_time": 10,
+      "due_time": 20,
+      "priority": "medium"
+    },
+    {
+      "job_id": "J3",
+      "family": "A",
+      "processing_time": 6,
+      "due_time": 25,
+      "priority": "high"
+    },
+    {
+      "job_id": "J4",
+      "family": "B",
+      "processing_time": 12,
+      "due_time": 30,
+      "priority": "medium"
+    },
+    {
+      "job_id": "J5",
+      "family": "C",
+      "processing_time": 15,
+      "due_time": 40,
+      "priority": "low"
+    },
+    {
+      "job_id": "J6",
+      "family": "A",
+      "processing_time": 5,
+      "due_time": 35,
+      "priority": "rush"
+    }
+  ]
+}

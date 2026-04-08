@@ -1,0 +1,17 @@
+benchmark:
+  name: shop_scheduler_env
+  version: 0.1.0
+  description: "Manufacturing production scheduling environment for OpenEnv benchmarks."
+  domain: manufacturing
+  tasks:
+    - id: easy_single_machine
+      name: "Easy: Single Machine"
+      description: "Optimize 5 jobs on 1 machine."
+    - id: medium_parallel_changeover
+      name: "Medium: Parallel Changeover"
+      description: "Two machines with setup times."
+    - id: hard_dynamic_arrivals
+      name: "Hard: Dynamic Arrivals"
+      description: "Adapt to new jobs arriving at runtime."
+  standard: "OpenEnv v1.0"
+  publisher: "Antigravity Scheduler Team"
