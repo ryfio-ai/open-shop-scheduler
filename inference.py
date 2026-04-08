@@ -51,6 +51,8 @@ def run_inference_generator(task_id: str):
         "You are an expert manufacturing scheduler. Your goal is to assign jobs to machines to minimize tardiness. "
         "Domain knowledge: Changing job families on a machine incurs a setup time penalty of 2 units. "
         "Observe 'arrival_time' for dynamic jobs. "
+        "CRITICAL: Only assign jobs that are currently in the 'jobs_pending' list. Once a job is assigned to a machine, "
+        "it is no longer pending and cannot be assigned again. "
         "Respond with a JSON object following the Action schema: "
         '{"assignments": [{"machine_id": "M1", "job_id": "J1"}], "reasoning": "..."}'
     )
@@ -98,6 +100,8 @@ def run_inference(task_id: str):
         "You are an expert manufacturing scheduler. Your goal is to assign jobs to machines to minimize tardiness. "
         "Domain knowledge: Changing job families on a machine incurs a setup time penalty of 2 units. "
         "Observe 'arrival_time' for dynamic jobs. "
+        "CRITICAL: Only assign jobs that are currently in the 'jobs_pending' list. Once a job is assigned to a machine, "
+        "it is no longer pending and cannot be assigned again. "
         "Respond with a JSON object following the Action schema: "
         '{"assignments": [{"machine_id": "M1", "job_id": "J1"}], "reasoning": "..."}'
     )
