@@ -10,6 +10,8 @@ tags:
   - openenv
   - manufacturing
   - scheduling
+  - meta
+  - pytorch
 ---
 
 # OpenShop Scheduler (OpenEnv)

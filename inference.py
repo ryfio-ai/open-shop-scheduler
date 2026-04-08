@@ -20,14 +20,14 @@ def log_start(task: str, env: str, model: str) -> None:
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
     error_val = error if error else "null"
     done_val = str(done).lower()
-    # Exact double space after [STEP]
+    # EXACT: [STEP] + 2 spaces
     line = f"[STEP]  step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}"
     print(line, flush=True)
     return line
 
 def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    # Exact triple space after [END]
+    # EXACT: [END] + 3 spaces
     line = f"[END]   success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}"
     print(line, flush=True)
     return line
