@@ -94,6 +94,15 @@ The environment was evaluated using the **HeuristicEDD** (Earliest Due Date) bas
 
 The environment follows the OpenEnv standard with Pydantic-typed observations and actions.
 
+### 🔐 Environment Variables
+To run the agent, you must set one of the following as a secret/env var:
+- `GROQ_API_KEY`: (Recommended) Get one free at [console.groq.com](https://console.groq.com).
+- `HF_TOKEN`: Your Hugging Face token (with Inference Providers access).
+
+Optional overrides:
+- `API_BASE_URL`: Defaults to Hugging Face Router.
+- `MODEL_NAME`: Override the default model ID.
+
 ### Observation Space
 - `current_time`: Global clock.
 - `machines`: List of machine states (idle/processing, family, time remaining).

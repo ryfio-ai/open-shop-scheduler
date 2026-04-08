@@ -2,43 +2,54 @@ import os
 import json
 import argparse
 import sys
-import time
 from typing import List, Optional
 from openai import OpenAI
 from envs.shop_scheduler_env.env import ShopSchedulerEnv
 from envs.shop_scheduler_env.models import Action
 
-# Mandatory environment variables
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+# --- API Configuration ---
+# Priority: GROQ_API_KEY -> HF_TOKEN
+# The code picks the first available provider automatically.
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-# Fallback model list to ensure reliability
-DEFAULT_MODELS = [
-    "meta-llama/Meta-Llama-3.1-8B-Instruct",
-    "mistralai/Mistral-7B-Instruct-v0.2",
-    "google/gemma-2-9b-it",
-    "deepseek-ai/deepseek-coder-33b-instruct",
-    "Qwen/Qwen2.5-7B-Instruct"
-]
+def get_client_and_models():
+    """Returns (OpenAI client, list of model IDs) based on available API keys."""
+    # Priority 1: Groq (free tier, very fast, reliable)
+    if GROQ_API_KEY:
+        client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=GROQ_API_KEY)
+        models = ["llama-3.1-8b-instant", "gemma2-9b-it", "mixtral-8x7b-32768"]
+        return client, models
 
-def log_start(task: str, env: str, model: str) -> None:
+    # Priority 2: HF Router (may have quota issues)
+    if HF_TOKEN:
+        base = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+        client = OpenAI(base_url=base, api_key=HF_TOKEN)
+        model_name = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
+        return client, [model_name]
+
+    return None, []
+
+# --- Logging helpers (OpenEnv compliant) ---
+def log_start(task: str, env: str, model: str) -> str:
     line = f"[START] task={task} env={env} model={model}"
     print(line, flush=True)
     return line
 
-def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
+def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> str:
     error_val = error if error else "null"
     done_val = str(done).lower()
     line = f"[STEP]  step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}"
     print(line, flush=True)
     return line
 
-def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> str:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
     line = f"[END]   success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}"
     print(line, flush=True)
     return line
 
+# --- Elite Scheduling Prompt ---
 ELITE_PROMPT = (
     "You are an ELITE manufacturing scheduler. Your goal is a 1.000 score by following this STRATEGIC HIERARCHY:\n\n"
     "1. RUSH JOBS FIRST: Identify all 'rush' jobs in 'jobs_pending'. Assign them immediately to any idle machines.\n"
@@ -52,24 +63,17 @@ ELITE_PROMPT = (
     '{"assignments": [{"machine_id": "M1", "job_id": "J1"}, {"machine_id": "M2", "job_id": "J2"}], "reasoning": "Reasoning here."}'
 )
 
+# --- Gradio streaming generator ---
 def run_inference_generator(task_id: str):
-    if not HF_TOKEN:
-        yield "Error: HF_TOKEN environment variable is not set."
+    client, models_to_try = get_client_and_models()
+    if client is None:
+        yield "Error: No API key set. Please set GROQ_API_KEY or HF_TOKEN."
         return
 
-    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     env = ShopSchedulerEnv(task_id=task_id)
     obs = env.reset()
 
-    # Determine which model to use
-    selected_model = os.getenv("MODEL_NAME")
-    models_to_try = [selected_model] if selected_model else DEFAULT_MODELS
-
     log_history = []
-    current_model = "unknown"
-
-    # We only log [START] once we successfully get a response or start the loop
-    # For simplicity in the dashboard, we use the first available model in the list
     current_model = models_to_try[0]
     start_log = log_start(task=task_id, env="shop_scheduler_env", model=current_model)
     log_history.append(start_log)
@@ -83,12 +87,11 @@ def run_inference_generator(task_id: str):
         while not done and step_count < 15:
             step_count += 1
             prompt = f"Current state: {obs.model_dump_json()}"
-            
-            # Fallback Retry Logic
+
             action_data = {}
             error_msg = None
             success_call = False
-            
+
             for model_attempt in models_to_try:
                 try:
                     response = client.chat.completions.create(
@@ -106,14 +109,14 @@ def run_inference_generator(task_id: str):
                     break
                 except Exception as e:
                     error_msg = str(e)
-                    if "402" in error_msg or "429" in error_msg or "model_not_found" in error_msg:
-                        continue # Try next model
+                    if "402" in error_msg or "429" in error_msg or "not_supported" in error_msg or "not supported" in error_msg:
+                        continue
                     else:
-                        break # Fatal error
+                        break
 
             if not success_call:
+                reward = 0.0
                 done = True
-                # Use last error_msg
             else:
                 try:
                     action = Action(**action_data)
@@ -125,8 +128,8 @@ def run_inference_generator(task_id: str):
                     done = True
                     error_msg = str(e)
 
-            rewards.append(reward if 'reward' in locals() else 0.0)
-            step_log = log_step(step=step_count, action=json.dumps(action_data), reward=rewards[-1], done=done, error=error_msg)
+            rewards.append(reward)
+            step_log = log_step(step=step_count, action=json.dumps(action_data), reward=reward, done=done, error=error_msg)
             log_history.append(step_log)
             yield "\n".join(log_history)
 
@@ -135,24 +138,19 @@ def run_inference_generator(task_id: str):
         end_log = log_end(success=(score > 0.1), steps=step_count, score=score, rewards=rewards)
         log_history.append(end_log)
         yield "\n".join(log_history)
-
     finally:
         pass
 
+# --- CLI entry point ---
 def run_inference(task_id: str):
-    # Standard CLI version with fallback
-    if not HF_TOKEN:
-        print("Error: HF_TOKEN not set", file=sys.stderr)
+    client, models_to_try = get_client_and_models()
+    if client is None:
+        print("Error: No API key set. Set GROQ_API_KEY or HF_TOKEN.", file=sys.stderr)
         sys.exit(1)
 
-    client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     env = ShopSchedulerEnv(task_id=task_id)
     obs = env.reset()
 
-    selected_model = os.getenv("MODEL_NAME")
-    models_to_try = [selected_model] if selected_model else DEFAULT_MODELS
-    
-    # Just show the first model in [START] for simplicity
     log_start(task=task_id, env="shop_scheduler_env", model=models_to_try[0])
 
     done = False
@@ -178,10 +176,13 @@ def run_inference(task_id: str):
                     success_call = True
                     break
                 except Exception as e:
-                    if "402" in str(e) or "429" in str(e): continue
-                    error = str(e); break
+                    if "402" in str(e) or "429" in str(e) or "not_supported" in str(e):
+                        continue
+                    error = str(e)
+                    break
 
-            if not success_call: break
+            if not success_call:
+                break
 
             action = Action(**action_dict)
             obs, reward_obj, done, info = env.step(action)
@@ -189,7 +190,8 @@ def run_inference(task_id: str):
             rewards.append(reward)
             log_step(step=step_count, action=json.dumps(action_dict).replace(" ", ""), reward=reward, done=done, error=info.get("last_action_error"))
 
-            if step_count >= 20: break
+            if step_count >= 20:
+                break
     finally:
         final_state = env.state()
         log_end(success=final_state.normalized_score >= 0.1, steps=step_count, score=final_state.normalized_score, rewards=rewards)
