@@ -4,16 +4,19 @@ version: "1.0.0"
 
 tasks:
   - id: "easy_single_machine"
-    name: "Easy: Single Machine"
-    description: "Optimize 5 jobs on 1 machine."
+    name: "Easy: Single Machine Scheduling"
+    description: "Solve a basic scheduling task on a single machine with changeovers."
+    difficulty: "easy"
     grader: "grade/easy_single_machine"
   - id: "medium_parallel_changeover"
     name: "Medium: Parallel Changeover"
-    description: "Two machines with setup times."
+    description: "Optimize scheduling across parallel machines with job-specific setup times."
+    difficulty: "medium"
     grader: "grade/medium_parallel_changeover"
   - id: "hard_dynamic_arrivals"
     name: "Hard: Dynamic Arrivals"
-    description: "Adapt to new jobs arriving at runtime."
+    description: "Manage complex scheduling scenarios with jobs arriving dynamically at runtime."
+    difficulty: "hard"
     grader: "grade/hard_dynamic_arrivals"
 
 app:
