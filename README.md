@@ -50,9 +50,9 @@ We evaluated the **Ryfio-AI Agent** (Llama 3.3 70B) across all three OpenEnv tie
 
 | Task ID | Difficulty | Baseline Score | **Agent Score** | Success |
 | :--- | :--- | :--- | :--- | :--- |
-| `easy_single_machine` | Easy | 0.360 | **0.460** | Yes |
+| `easy_single_machine` | Easy | 0.360 | **0.500** | Yes |
 | `medium_parallel_changeover` | Medium | 1.000 | **1.000** | **Yes** |
-| `hard_dynamic_arrivals` | Hard | 1.000 | **0.960** | **Yes** |
+| `hard_dynamic_arrivals` | Hard | 1.000 | **0.920** | **Yes** |
 
 ## 🚀 Advanced Features
 

@@ -10,14 +10,17 @@ tasks:
     name: "Easy: Single Machine"
     difficulty: easy
     description: "Optimize 5 jobs on 1 machine."
+    grader: envs.shop_scheduler_env.graders:grade_episode
   - id: medium_parallel_changeover
     name: "Medium: Parallel Changeover"
     difficulty: medium
     description: "Two machines with setup times."
+    grader: envs.shop_scheduler_env.graders:grade_episode
   - id: hard_dynamic_arrivals
     name: "Hard: Dynamic Arrivals"
     difficulty: hard
     description: "Adapt to new jobs arriving at runtime."
+    grader: envs.shop_scheduler_env.graders:grade_episode
 
 app:
   port: 7860
