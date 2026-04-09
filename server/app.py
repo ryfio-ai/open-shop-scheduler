@@ -12,6 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from inference import run_inference_generator, get_client_and_models
 from envs.shop_scheduler_env.env import ShopSchedulerEnv
 from envs.shop_scheduler_env.models import Action
+from envs.shop_scheduler_env.graders import grade_episode
 
 # Initialize Core API Env
 api_env = ShopSchedulerEnv(task_id="easy_single_machine")
@@ -29,6 +30,24 @@ async def step(request: Request):
     action = Action(**data)
     obs, reward_obj, done, info = api_env.step(action)
     return JSONResponse(content={"observation": obs.model_dump(), "reward": reward_obj.value, "done": done, "info": info})
+
+# --- Hackathon-Specific Grading Endpoints ---
+@app.get("/grade/{task_id}")
+async def get_grade(task_id: str):
+    """Returns the current episode score for validation."""
+    score = grade_episode(api_env.state)
+    # Clamp to hackathon expectations if needed, but grade_episode is already 0-1
+    return JSONResponse(content={
+        "score": score,
+        "reward": score,  # Some validators look for reward instead of score
+        "status": "completed" if api_env.state.done else "in_progress",
+        "reasoning": f"Current tardiness-based score for {task_id}"
+    })
+
+@app.post("/grade/{task_id}")
+async def post_grade(task_id: str):
+    """POST version for validators that use POST."""
+    return await get_grade(task_id)
 
 # --- Gradio Premium UI ---
 def create_ui():

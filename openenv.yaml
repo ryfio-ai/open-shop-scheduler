@@ -6,15 +6,15 @@ tasks:
   - id: "easy_single_machine"
     name: "Easy: Single Machine"
     description: "Optimize 5 jobs on 1 machine."
-    grader: "grader:grade"
+    grader: "grade/easy_single_machine"
   - id: "medium_parallel_changeover"
     name: "Medium: Parallel Changeover"
     description: "Two machines with setup times."
-    grader: "grader:grade"
+    grader: "grade/medium_parallel_changeover"
   - id: "hard_dynamic_arrivals"
     name: "Hard: Dynamic Arrivals"
     description: "Adapt to new jobs arriving at runtime."
-    grader: "grader:grade"
+    grader: "grade/hard_dynamic_arrivals"
 
 app:
   port: 7860
