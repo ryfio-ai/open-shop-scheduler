@@ -1,28 +1,28 @@
-name: shop_scheduler_env
-version: 1.0.0
-description: "A manufacturing production scheduling environment for agentic evaluation."
-domain: manufacturing
 standard: "OpenEnv v1.0"
+name: "shop-scheduler-env"
+version: "1.0.0"
+description: "A manufacturing production scheduling environment for agentic evaluation."
+domain: "manufacturing"
 publisher: "TEAM RYFIO"
 
 tasks:
-  - id: easy_single_machine
+  - id: "easy_single_machine"
     name: "Easy: Single Machine"
-    difficulty: easy
+    difficulty: "easy"
     description: "Optimize 5 jobs on 1 machine."
-    grader: envs.shop_scheduler_env.graders:grade_episode
-  - id: medium_parallel_changeover
+    grader: "grader:grade"
+  - id: "medium_parallel_changeover"
     name: "Medium: Parallel Changeover"
-    difficulty: medium
+    difficulty: "medium"
     description: "Two machines with setup times."
-    grader: envs.shop_scheduler_env.graders:grade_episode
-  - id: hard_dynamic_arrivals
+    grader: "grader:grade"
+  - id: "hard_dynamic_arrivals"
     name: "Hard: Dynamic Arrivals"
-    difficulty: hard
+    difficulty: "hard"
     description: "Adapt to new jobs arriving at runtime."
-    grader: envs.shop_scheduler_env.graders:grade_episode
+    grader: "grader:grade"
 
 app:
   port: 7860
-  runtime: python
-  entrypoint: server/app.py
+  runtime: "python"
+  entrypoint: "server/app.py"
