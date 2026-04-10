@@ -7,45 +7,47 @@ sys.path.append(str(Path(__file__).parent.parent))
 from envs.shop_scheduler_env.env import ShopSchedulerEnv
 from envs.shop_scheduler_env.models import Action, MachineAssignment
 
-def run_smoke_test():
-    print("Starting smoke test for ShopSchedulerEnv...")
-    env = ShopSchedulerEnv(task_id="easy_single_machine")
+def run_smoke_test(task_id: str):
+    print(f"--- Starting smoke test for {task_id} ---")
+    env = ShopSchedulerEnv(task_id=task_id)
     obs = env.reset()
     
     print(f"Initial State: Time={obs.current_time}, Pending Jobs={len(obs.jobs_pending)}")
     
     done = False
     step = 0
-    while not done and step < 10:
+    while not done and step < 50:
         step += 1
-        # Heuristic: Pick the job with the earliest due date
-        if obs.jobs_pending:
-            # Sort by due_time
+        # Heuristic: Pick the job with the earliest due date for ANY idle machine
+        idle_machines = [m for m in obs.machines if m.status == "idle"]
+        assignments = []
+        
+        if idle_machines and obs.jobs_pending:
             sorted_jobs = sorted(obs.jobs_pending, key=lambda x: x.due_time)
-            target_job = sorted_jobs[0]
+            for m in idle_machines:
+                if sorted_jobs:
+                    job = sorted_jobs.pop(0)
+                    assignments.append(MachineAssignment(machine_id=m.machine_id, job_id=job.job_id))
             
-            # Create action
             action = Action(
-                assignments=[
-                    MachineAssignment(machine_id="M1", job_id=target_job.job_id)
-                ],
-                reasoning=f"Heuristic: Selecting job {target_job.job_id} with due date {target_job.due_time}"
+                assignments=assignments,
+                reasoning=f"Heuristic: Assigned {len(assignments)} jobs based on EDD."
             )
         else:
-            # No pending jobs, just step (idle)
             action = Action(assignments=[])
             
         obs, reward, done, info = env.step(action)
-        print(f"Step {step}: Time={obs.current_time}, Reward={reward.value}, Score={info['score']:.2f}, Pending={len(obs.jobs_pending)}, Completed={len(obs.completed_jobs)}")
+        if step % 5 == 0 or done:
+            print(f"Step {step}: Time={obs.current_time}, Score={info['score']:.2f}, Completed={len(obs.completed_jobs)}/{len(env.state().jobs)}")
         
-    print("Smoke test completed.")
     final_state = env.state()
-    print(f"Final Score: {final_state.normalized_score:.4f}")
-    
-    if final_state.normalized_score > 0.5:
-        print("Test Result: SUCCESS (Score looks reasonable)")
-    else:
-        print("Test Result: WARNING (Score is low, check logic)")
+    print(f"Final Results for {task_id}: Score={final_state.normalized_score:.4f}, Done={final_state.done}")
+    print("-------------------------------------------\n")
 
 if __name__ == "__main__":
-    run_smoke_test()
+    tasks = ["easy_single_machine", "medium_parallel_changeover", "hard_dynamic_arrivals"]
+    for tid in tasks:
+        try:
+            run_smoke_test(tid)
+        except Exception as e:
+            print(f"Error testing {tid}: {e}")
