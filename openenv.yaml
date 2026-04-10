@@ -6,15 +6,15 @@ tasks:
   - id: "easy_single_machine"
     name: "Easy: Single Machine Scheduling"
     description: "Solve a basic scheduling task on a single machine with changeovers."
-    grader: "grade/easy_single_machine"
+    grader: "grader:grade"
   - id: "medium_parallel_changeover"
     name: "Medium: Parallel Changeover"
     description: "Optimize scheduling across parallel machines with job-specific setup times."
-    grader: "grade/medium_parallel_changeover"
+    grader: "grader:grade"
   - id: "hard_dynamic_arrivals"
     name: "Hard: Dynamic Arrivals"
     description: "Manage complex scheduling scenarios with jobs arriving dynamically at runtime."
-    grader: "grade/hard_dynamic_arrivals"
+    grader: "grader:grade"
 
 app:
   port: 7860
