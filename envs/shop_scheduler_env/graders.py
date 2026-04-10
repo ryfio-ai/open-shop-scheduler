@@ -24,4 +24,4 @@ def grade_episode(state: EnvState) -> float:
     tardiness_cap = 50.0
     score = 1.0 - (total_tardiness / tardiness_cap)
     
-    return max(0.0, min(1.0, score))
+    return max(0.05, min(0.95, float(score)))

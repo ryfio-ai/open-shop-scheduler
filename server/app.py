@@ -37,7 +37,7 @@ def _compute_grade(task_id: str) -> dict:
         state = env.state()
         raw_score = grade_episode(state)
         # Clamp to [0.01, 0.99] - validated behaviour from successful submissions
-        safe_score = max(0.01, min(0.99, float(raw_score)))
+        safe_score = max(0.05, min(0.95, float(raw_score)))
         return {
             "score": safe_score,
             "reward": safe_score,
@@ -45,8 +45,8 @@ def _compute_grade(task_id: str) -> dict:
         }
     except Exception as e:
         return {
-            "score": 0.01,
-            "reward": 0.01,
+            "score": 0.05,
+            "reward": 0.05,
             "reasoning": f"Error during grading of {task_id}: {str(e)}"
         }
 
