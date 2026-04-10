@@ -1,25 +1,28 @@
-spec_version: "1"
-name: "shop-scheduler-env"
+spec_version: 1
+name: "open-shop-scheduler"
+type: space
+runtime: fastapi
+benchmark: "meta-hackathon-v1"
 version: "1.0.0"
+description: "AI-driven Open Shop Scheduler for industrial environments."
 
 tasks:
   - id: "easy_single_machine"
     name: "Easy: Single Machine Scheduling"
     description: "Solve a basic scheduling task on a single machine with changeovers."
     difficulty: "easy"
-    grader: "grade/easy_single_machine"
+    grader: "envs.shop_scheduler_env.graders:grade_episode"
   - id: "medium_parallel_changeover"
     name: "Medium: Parallel Changeover"
     description: "Optimize scheduling across parallel machines with job-specific setup times."
     difficulty: "medium"
-    grader: "grade/medium_parallel_changeover"
+    grader: "envs.shop_scheduler_env.graders:grade_episode"
   - id: "hard_dynamic_arrivals"
     name: "Hard: Dynamic Arrivals"
     description: "Manage complex scheduling scenarios with jobs arriving dynamically at runtime."
     difficulty: "hard"
-    grader: "grade/hard_dynamic_arrivals"
+    grader: "envs.shop_scheduler_env.graders:grade_episode"
 
 app:
   port: 7860
-  runtime: "python"
-  entrypoint: "server/app.py"
+  entrypoint: "server.app:app"

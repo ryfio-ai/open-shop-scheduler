@@ -1,10 +1,14 @@
 from .models import EnvState
 
-def grade_episode(state: EnvState) -> float:
+def grade_episode(state) -> float:
     """
     Computes a deterministic score for the episode in the 0.0-1.0 range.
     Based on total tardiness across all jobs.
     """
+    # Robustness: Handle dictionary input if the autograder doesn't pass a Pydantic object
+    if isinstance(state, dict):
+        state = EnvState.model_validate(state)
+    
     total_tardiness = 0
     
     for job in state.jobs:
