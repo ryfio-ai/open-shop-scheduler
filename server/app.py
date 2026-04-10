@@ -104,12 +104,11 @@ def create_ui():
                 model_name = gr.Dropdown(choices=models if models else ["llama-3.1-8b-instant"], value=models[0] if models else "llama-3.1-8b-instant", label="AI Model")
                 run_btn = gr.Button("🚀 Start Loop", variant="primary")
             with gr.Column(scale=3):
-                with hide_logs := gr.Column(visible=True):
-                    with gr.Row():
-                        m1 = gr.Textbox(label="Jobs Done", value="0")
-                        m2 = gr.Textbox(label="Reward", value="0.00")
-                        m4 = gr.Textbox(label="Score", value="0.000")
-                        m3 = gr.Textbox(label="Status", value="Ready")
+                with gr.Row():
+                    m1 = gr.Textbox(label="Jobs Done", value="0")
+                    m2 = gr.Textbox(label="Reward", value="0.00")
+                    m4 = gr.Textbox(label="Score", value="0.000")
+                    m3 = gr.Textbox(label="Status", value="Ready")
                 output_area = gr.Markdown(value="*Idle.*", container=True)
 
         def runner(tid, smode, mname):
