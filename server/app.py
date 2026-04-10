@@ -55,8 +55,13 @@ _api_env = ShopSchedulerEnv(task_id="easy_single_machine")
 
 @app.post("/reset")
 async def reset(request: Request):
-    data = await request.json()
-    task_id = data.get("task_id", "easy_single_machine")
+    task_id = "easy_single_machine"
+    try:
+        data = await request.json()
+        task_id = data.get("task_id", task_id)
+    except:
+        # Gracefully handle empty or malformed JSON
+        pass
     global _api_env
     _api_env = ShopSchedulerEnv(task_id=task_id)
     obs = _api_env.reset()
@@ -64,8 +69,12 @@ async def reset(request: Request):
 
 @app.post("/step")
 async def step(request: Request):
-    data = await request.json()
-    action = Action(**data)
+    try:
+        data = await request.json()
+        action = Action(**data)
+    except:
+        # Provide a no-op safety action if body is missing
+        action = Action(assignments=[])
     obs, reward_obj, done, info = _api_env.step(action)
     return JSONResponse(content={"observation": obs.model_dump(), "reward": reward_obj.value, "done": done, "info": info})
 
