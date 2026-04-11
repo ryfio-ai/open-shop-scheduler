@@ -1,35 +1,28 @@
 spec_version: 1
 name: open-shop-scheduler
-type: environment
-runtime: docker
-app: server/app.py
-port: 7860
-
-metadata:
-  title: "Open Shop Scheduler AI"
-  description: "Meta PyTorch Hackathon: Optimizing manufacturing scheduling with RL."
-  version: "1.0.0"
-
-endpoints:
-  reset: "/reset"
-  step: "/step"
-  state: "/state"
-  tasks: "/tasks"
-  grade: "/grade"
+type: space
+runtime: fastapi
+benchmark: "meta-hackathon-v1"
+version: "1.0.0"
+description: "AI-driven Open Shop Scheduler with complex constraints."
 
 tasks:
   - id: easy_single_machine
     name: "Easy: Single Machine"
-    description: "Basic scheduling task."
-    pass_criterion: "score >= 0.7"
-    difficulty: easy
+    description: "Schedule jobs on a single machine."
+    difficulty: "easy"
+    grader: "server.graders:EasyGrader"
   - id: medium_parallel_changeover
     name: "Medium: Parallel"
     description: "Machines with changeovers."
-    pass_criterion: "score >= 0.6"
-    difficulty: medium
+    difficulty: "medium"
+    grader: "server.graders:MediumGrader"
   - id: hard_dynamic_arrivals
     name: "Hard: Dynamic"
     description: "Real-time task arrivals."
-    pass_criterion: "score >= 0.5"
-    difficulty: hard
+    difficulty: "hard"
+    grader: "server.graders:HardGrader"
+
+app:
+  port: 7860
+  entrypoint: "server.app:app"
