@@ -75,20 +75,19 @@ def health():
 def list_tasks():
     """Return all tasks that have an associated grader.
     The evaluator calls this and counts tasks where has_grader==True.
-    Must return >= 3 tasks to pass Task Validation."""
-    return {
-        "tasks": [
-            {
-                "id": t["id"],
-                "description": t["description"],
-                "difficulty": t["difficulty"],
-                "has_grader": True,          # ← critical field
-                "num_jobs": t["num_jobs"],
-                "num_machines": t["num_machines"],
-            }
-            for t in TASKS.values()
-        ]
-    }
+    Must return a flat list of >= 3 tasks to pass Task Validation."""
+    return [
+        {
+            "id": t["id"],
+            "description": t["description"],
+            "difficulty": t["difficulty"],
+            "grader": True,
+            "has_grader": True,
+            "num_jobs": t["num_jobs"],
+            "num_machines": t["num_machines"],
+        }
+        for t in TASKS.values()
+    ]
 
 
 # ── /grader  (REQUIRED by Phase-2 evaluator) ─────────────────────────────────
