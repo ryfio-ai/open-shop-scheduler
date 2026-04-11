@@ -25,6 +25,7 @@ TASKS = [
             "Focuses on basic EDD ordering."
         ),
         "difficulty": "easy",
+        "has_grader": True,
         "grader": True,
         "grader_endpoint": "/grader",
     },
@@ -36,6 +37,7 @@ TASKS = [
             "Switching job-family incurs a 2-unit setup penalty."
         ),
         "difficulty": "medium",
+        "has_grader": True,
         "grader": True,
         "grader_endpoint": "/grader",
     },
@@ -47,6 +49,7 @@ TASKS = [
             "Agent must adapt to real-time arrivals while minimising tardiness."
         ),
         "difficulty": "hard",
+        "has_grader": True,
         "grader": True,
         "grader_endpoint": "/grader",
     },

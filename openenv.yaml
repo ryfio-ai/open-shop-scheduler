@@ -2,5 +2,20 @@ spec_version: 1
 name: open-shop-scheduler
 type: space
 runtime: fastapi
-app: server.app:app
-port: 7860
+version: "1.0.0"
+description: "Industrial Open Shop Scheduler with complex constraints."
+
+tasks:
+  - id: easy_single_machine
+    description: "Schedule jobs on a single machine."
+    grader: true
+  - id: medium_parallel_changeover
+    description: "Machines with parallel switch setup."
+    grader: true
+  - id: hard_dynamic_arrivals
+    description: "Real-time arriving job adaptation."
+    grader: true
+
+app:
+  port: 7860
+  entrypoint: "server.app:app"
