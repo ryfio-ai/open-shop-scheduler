@@ -93,20 +93,21 @@ def list_tasks():
 
 # ── /grader  (REQUIRED by Phase-2 evaluator) ─────────────────────────────────
 @app.post("/grader")
-def grader(req: GraderRequest):
+def grader(req: Optional[GraderRequest] = None):
     """Grade a schedule without running a full episode.
     Returns a score in [0.0, 1.0].
     The evaluator calls this per task to verify the grader works."""
-    task = TASKS.get(req.task_id)
+    task_id = req.task_id if req else "easy_single_machine"
+    task = TASKS.get(task_id)
     if not task:
-        raise HTTPException(status_code=404, detail=f"Unknown task_id: {req.task_id}")
+        raise HTTPException(status_code=404, detail=f"Unknown task_id: {task_id}")
 
     score = grade_schedule(
         task=task,
-        assignments=[{"machine_id": a.machine_id, "job_id": a.job_id} for a in req.assignments],
+        assignments=[{"machine_id": a.machine_id, "job_id": a.job_id} for a in req.assignments] if req else [],
     )
     return {
-        "task_id": req.task_id,
+        "task_id": task_id,
         "score": score,
         "reward": score,
         "grader": "deterministic",
@@ -115,10 +116,11 @@ def grader(req: GraderRequest):
 
 # ── /reset ────────────────────────────────────────────────────────────────────
 @app.post("/reset")
-def reset(req: ResetRequest):
-    task = TASKS.get(req.task_id)
+def reset(req: Optional[ResetRequest] = None):
+    task_id = req.task_id if req else "easy_single_machine"
+    task = TASKS.get(task_id)
     if not task:
-        raise HTTPException(status_code=404, detail=f"Unknown task_id: {req.task_id}")
+        raise HTTPException(status_code=404, detail=f"Unknown task_id: {task_id}")
 
     episode_id = str(uuid.uuid4())
     env = ShopEnvironment(task)
