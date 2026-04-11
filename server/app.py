@@ -1,261 +1,161 @@
 """
-server/app.py  ─  FINAL, DEFINITIVE VERSION
-============================================
-DROP this file into your repo at:   server/app.py
-
-This is a completely self-contained FastAPI server.
-NO Gradio, NO external grader imports that could fail.
-Everything the validator needs is embedded right here.
-
-Validator flow:
-  1. GET  /health          → {"status":"ok"}
-  2. GET  /tasks           → [{task_id, grader:true, ...}, ...]  (3 items)
-  3. POST /grader          → {"score": float}  strictly (0.001 – 0.999)
-  4. POST /reset           → Observation JSON
-  5. POST /step            → {observation, reward, done, info}
-  6. GET  /state           → state JSON
+OpenShop Scheduler — FastAPI server
+Fixes Phase 2 Task Validation by exposing:
+  GET  /tasks        → lists all 3 tasks with graders
+  POST /grader       → grades a schedule for a given task_id
 """
 
 import os
-import sys
-import json
-import uvicorn
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+import time
+import uuid
+from typing import Any, Dict, List, Optional
 
-# ── path so we can import the env ──────────────────────────────
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
-# ── lazy imports so server still starts even if env has issues ─
-try:
-    from envs.shop_scheduler_env.env import ShopSchedulerEnv
-    from envs.shop_scheduler_env.models import Action
-    _ENV_AVAILABLE = True
-except Exception as _e:
-    _ENV_AVAILABLE = False
-    print(f"[WARN] env import failed: {_e}", flush=True)
+# ── Import environment logic ─────────────────────────────────────────────────
+from server.environment import (
+    TASKS,
+    ShopEnvironment,
+    grade_schedule,
+)
 
-# ══════════════════════════════════════════════════════════════════
-app = FastAPI(title="Open Shop Scheduler — OpenEnv")
+# ── FastAPI app ───────────────────────────────────────────────────────────────
+app = FastAPI(
+    title="OpenShop Scheduler",
+    description="Open-shop scheduling RL environment for the Meta PyTorch OpenEnv Hackathon",
+    version="1.0.0",
+)
 
-# ─────────────────────────────────────────────────────────────────
-# TASK CATALOGUE  ← this is what the validator reads
-# Rules:
-#   • exactly 3 entries
-#   • each has  "grader": True  (Python True → JSON true)
-#   • "grader_endpoint": "/grader"
-# ─────────────────────────────────────────────────────────────────
-TASKS = [
-    {
-        "task_id":         "easy_single_machine",
-        "name":            "Easy: Single Machine Scheduling",
-        "description":     "Sequence 5 jobs on one machine to minimise tardiness.",
-        "difficulty":      "easy",
-        "grader":          True,
-        "grader_endpoint": "/grader",
-    },
-    {
-        "task_id":         "medium_parallel_changeover",
-        "name":            "Medium: Parallel Machines with Changeover",
-        "description":     "6 jobs on 2 machines; switching family costs 2 time-units.",
-        "difficulty":      "medium",
-        "grader":          True,
-        "grader_endpoint": "/grader",
-    },
-    {
-        "task_id":         "hard_dynamic_arrivals",
-        "name":            "Hard: Dynamic Job Arrivals",
-        "description":     "8 jobs on 3 machines; jobs arrive at different times.",
-        "difficulty":      "hard",
-        "grader":          True,
-        "grader_endpoint": "/grader",
-    },
-]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# ─────────────────────────────────────────────────────────────────
-# SAFE SCORE HELPER
-# The validator rejects 0.0 and 1.0 exactly.
-# We guarantee:  0.001 ≤ score ≤ 0.999
-# ─────────────────────────────────────────────────────────────────
-def _safe(v: float) -> float:
-    return max(0.001, min(0.999, float(v)))
+# ── In-memory session store ───────────────────────────────────────────────────
+_sessions: Dict[str, ShopEnvironment] = {}
 
 
-# ─────────────────────────────────────────────────────────────────
-# BUILT-IN GRADER
-# Fully self-contained — does not rely on the env class.
-# Uses hardcoded known-good scores for each task so the validator
-# always gets a deterministic, in-range value.
-# ─────────────────────────────────────────────────────────────────
-_KNOWN_SCORES = {
-    "easy_single_machine":       0.45,   # baseline greedy score
-    "medium_parallel_changeover": 0.62,  # baseline greedy score
-    "hard_dynamic_arrivals":      0.38,  # baseline greedy score
-}
-
-def _compute_grade(task_id: str) -> dict:
-    """
-    Returns a grader response with score strictly in (0.001, 0.999).
-    Tries to run the real environment first; falls back to known scores.
-    """
-    # --- try the real environment ----------------------------------
-    if _ENV_AVAILABLE:
-        try:
-            env = ShopSchedulerEnv(task_id=task_id)
-            obs = env.reset()
-            done = False
-            steps = 0
-            while not done and steps < 60:
-                idle = [m.machine_id for m in obs.machines if m.status == "idle"]
-                pending = sorted(obs.jobs_pending, key=lambda j: j.due_time)
-                assignments = [
-                    {"machine_id": m_id, "job_id": j.job_id}
-                    for m_id, j in zip(idle, pending)
-                ]
-                obs, _, done, _ = env.step(Action(assignments=assignments))
-                steps += 1
-
-            state = env.state()
-            jobs   = state.jobs
-            total  = len(jobs)
-            if total == 0:
-                raise ValueError("no jobs")
-
-            tardiness = 0.0
-            for job in jobs:
-                if job.status == "completed" and job.completion_time is not None:
-                    tardiness += max(0.0, job.completion_time - job.due_time)
-                else:
-                    tardiness += max(0.0, state.current_time - job.due_time) + 15.0
-
-            cap   = 20.0 * total
-            raw   = 1.0 - (tardiness / cap)
-            score = _safe(raw)
-
-            return {
-                "score":     score,
-                "reward":    score,
-                "task_id":   task_id,
-                "reasoning": f"EDD greedy on '{task_id}': {steps} steps, "
-                             f"tardiness={tardiness:.1f}, raw={raw:.4f}, score={score:.4f}",
-            }
-        except Exception as exc:
-            print(f"[WARN] live grader failed for '{task_id}': {exc}", flush=True)
-
-    # --- deterministic fallback ------------------------------------
-    score = _safe(_KNOWN_SCORES.get(task_id, 0.40))
-    return {
-        "score":     score,
-        "reward":    score,
-        "task_id":   task_id,
-        "reasoning": f"Fallback deterministic score for '{task_id}'.",
-    }
+# ── Request / Response models ─────────────────────────────────────────────────
+class Assignment(BaseModel):
+    machine_id: int
+    job_id: str
 
 
-# ══════════════════════════════════════════════════════════════════
-#  ENDPOINTS
-# ══════════════════════════════════════════════════════════════════
+class Action(BaseModel):
+    assignments: List[Assignment]
+    reasoning: Optional[str] = ""
+
+
+class ResetRequest(BaseModel):
+    task_id: str = "easy_single_machine"
+
+
+class GraderRequest(BaseModel):
+    task_id: str
+    assignments: List[Assignment]
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/health")
-async def health():
-    return JSONResponse({"status": "ok", "env": "open-shop-scheduler"})
+def health():
+    return {"status": "ok", "timestamp": time.time()}
 
 
+# ── /tasks  (REQUIRED by Phase-2 evaluator) ──────────────────────────────────
 @app.get("/tasks")
-@app.post("/tasks")
-async def get_tasks():
-    # Return as JSON — Python True becomes JSON true automatically
-    return JSONResponse(content=TASKS)
-
-
-# ── /grader  (POST — what the validator calls) ───────────────────
-@app.post("/grader")
-async def grader_post(request: Request):
-    task_id = "easy_single_machine"
-    try:
-        body    = await request.json()
-        task_id = body.get("task_id", task_id)
-    except Exception:
-        pass
-    return JSONResponse(content=_compute_grade(task_id))
-
-
-# ── /grader  (GET — belt-and-braces) ─────────────────────────────
-@app.get("/grader")
-async def grader_get(task_id: str = "easy_single_machine"):
-    return JSONResponse(content=_compute_grade(task_id))
-
-
-# ── /reset ───────────────────────────────────────────────────────
-@app.post("/reset")
-async def reset(request: Request):
-    if not _ENV_AVAILABLE:
-        return JSONResponse({"error": "env not available"}, status_code=503)
-    task_id = "easy_single_machine"
-    try:
-        data    = await request.json()
-        task_id = data.get("task_id", task_id)
-    except Exception:
-        pass
-    env = ShopSchedulerEnv(task_id=task_id)
-    obs = env.reset()
-    # store on app state so /step and /state can use it
-    app.state.env      = env
-    app.state.task_id  = task_id
-    return JSONResponse(content=obs.model_dump())
-
-
-# ── /step ────────────────────────────────────────────────────────
-@app.post("/step")
-async def step_ep(request: Request):
-    env = getattr(app.state, "env", None)
-    if env is None:
-        return JSONResponse({"error": "call /reset first"}, status_code=400)
-    try:
-        data   = await request.json()
-        action = Action(**data)
-    except Exception:
-        action = Action(assignments=[])
-    obs, reward_obj, done, info = env.step(action)
-    response = {
-        "observation": obs.model_dump(),
-        "reward":      float(reward_obj.value),
-        "done":        done,
-        "info":        info,
+def list_tasks():
+    """Return all tasks that have an associated grader.
+    The evaluator calls this and counts tasks where has_grader==True.
+    Must return >= 3 tasks to pass Task Validation."""
+    return {
+        "tasks": [
+            {
+                "id": t["id"],
+                "description": t["description"],
+                "difficulty": t["difficulty"],
+                "has_grader": True,          # ← critical field
+                "num_jobs": t["num_jobs"],
+                "num_machines": t["num_machines"],
+            }
+            for t in TASKS.values()
+        ]
     }
-    if done:
-        grade                  = _compute_grade(app.state.task_id)
-        response["score"]      = grade["score"]
-        response["final_grade"]= grade["score"]
-    return JSONResponse(content=response)
 
 
-# ── /state ───────────────────────────────────────────────────────
-@app.get("/state")
-@app.post("/state")
-async def get_state():
-    env = getattr(app.state, "env", None)
+# ── /grader  (REQUIRED by Phase-2 evaluator) ─────────────────────────────────
+@app.post("/grader")
+def grader(req: GraderRequest):
+    """Grade a schedule without running a full episode.
+    Returns a score in [0.0, 1.0].
+    The evaluator calls this per task to verify the grader works."""
+    task = TASKS.get(req.task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Unknown task_id: {req.task_id}")
+
+    score = grade_schedule(
+        task=task,
+        assignments=[{"machine_id": a.machine_id, "job_id": a.job_id} for a in req.assignments],
+    )
+    return {
+        "task_id": req.task_id,
+        "score": score,
+        "reward": score,
+        "grader": "deterministic",
+    }
+
+
+# ── /reset ────────────────────────────────────────────────────────────────────
+@app.post("/reset")
+def reset(req: ResetRequest):
+    task = TASKS.get(req.task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Unknown task_id: {req.task_id}")
+
+    episode_id = str(uuid.uuid4())
+    env = ShopEnvironment(task)
+    _sessions[episode_id] = env
+
+    obs = env.get_observation()
+    return {
+        "episode_id": episode_id,
+        "task_id": req.task_id,
+        "observation": obs,
+        "reward": 0.0,
+        "done": False,
+        "info": {},
+    }
+
+
+# ── /step ─────────────────────────────────────────────────────────────────────
+@app.post("/step/{episode_id}")
+def step(episode_id: str, action: Action):
+    env = _sessions.get(episode_id)
     if env is None:
-        return JSONResponse({"error": "call /reset first"}, status_code=400)
-    return JSONResponse(content=env.state().model_dump())
+        raise HTTPException(status_code=404, detail="Episode not found. Call /reset first.")
+
+    result = env.step(
+        assignments=[{"machine_id": a.machine_id, "job_id": a.job_id} for a in action.assignments],
+        reasoning=action.reasoning,
+    )
+    if result["done"]:
+        _sessions.pop(episode_id, None)
+
+    return result
 
 
-# ── root ─────────────────────────────────────────────────────────
-@app.get("/")
-async def root():
-    return JSONResponse({
-        "env":       "open-shop-scheduler",
-        "status":    "ok",
-        "endpoints": ["/health", "/tasks", "/grader", "/reset", "/step", "/state"],
-    })
-
-
-# ══════════════════════════════════════════════════════════════════
-def main():
-    port = int(os.getenv("PORT", 7860))
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
-
-
-if __name__ == "__main__":
-    main()
+# ── /state ────────────────────────────────────────────────────────────────────
+@app.get("/state/{episode_id}")
+def state(episode_id: str):
+    env = _sessions.get(episode_id)
+    if env is None:
+        raise HTTPException(status_code=404, detail="Episode not found.")
+    return {
+        "episode_id": episode_id,
+        "observation": env.get_observation(),
+        "done": env.is_done(),
+    }

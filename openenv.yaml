@@ -4,3 +4,19 @@ type: space
 runtime: fastapi
 app: server.app:app
 port: 7860
+
+tasks:
+  - id: easy_single_machine
+    description: "Schedule 5 jobs on 1 machine to minimize tardiness. Basic sequencing task."
+    grader: true
+    difficulty: easy
+
+  - id: medium_parallel_changeover
+    description: "Schedule 6 jobs on 2 parallel machines with family-based changeover penalties."
+    grader: true
+    difficulty: medium
+
+  - id: hard_dynamic_arrivals
+    description: "Schedule 8 jobs on 3 machines with dynamic arrivals at different times."
+    grader: true
+    difficulty: hard
