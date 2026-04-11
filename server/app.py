@@ -164,6 +164,14 @@ def state(episode_id: str):
         "done": env.is_done(),
     }
 
+@app.get("/")
+def root():
+    return {
+        "env": "open-shop-scheduler",
+        "status": "ok",
+        "endpoints": ["/health", "/tasks", "/grader", "/reset", "/step", "/state"]
+    }
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 7860))
