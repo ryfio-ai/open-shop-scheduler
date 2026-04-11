@@ -32,7 +32,7 @@ class ResetRequest(BaseModel):
 
 class GraderRequest(BaseModel):
     task_id: str
-    episode_state: dict
+    episode_state: Optional[dict] = {}
 
 class GraderResponse(BaseModel):
     score: float
@@ -79,19 +79,22 @@ def grader_endpoint(request: GraderRequest):
     """Grade an episode - REQUIRED for Phase 2 validation"""
     task_id = request.task_id
     
+    # Handle missing or None episode_state
+    episode_state = request.episode_state if request.episode_state is not None else {}
+    
     # DEBUG: Log everything
     print(f"[DEBUG] === GRADER CALLED ===", flush=True)
     print(f"[DEBUG] task_id: {task_id}", flush=True)
-    print(f"[DEBUG] episode_state type: {type(request.episode_state)}", flush=True)
-    print(f"[DEBUG] episode_state: {request.episode_state}", flush=True)
+    print(f"[DEBUG] episode_state type: {type(episode_state)}", flush=True)
+    print(f"[DEBUG] episode_state: {episode_state}", flush=True)
     
     try:
         if task_id == "easy_single_machine":
-            score = grade_easy_single_machine(request.episode_state)
+            score = grade_easy_single_machine(episode_state)
         elif task_id == "medium_parallel_changeover":
-            score = grade_medium_parallel_changeover(request.episode_state)
+            score = grade_medium_parallel_changeover(episode_state)
         elif task_id == "hard_dynamic_arrivals":
-            score = grade_hard_dynamic_arrivals(request.episode_state)
+            score = grade_hard_dynamic_arrivals(episode_state)
         else:
             print(f"[DEBUG] Unknown task: {task_id}", flush=True)
             raise HTTPException(status_code=400, detail=f"Unknown task: {task_id}")
