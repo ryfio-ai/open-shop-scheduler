@@ -6,9 +6,13 @@ Fixes Phase 2 Task Validation by exposing:
 """
 
 import os
+import sys
 import time
 import uuid
 from typing import Any, Dict, List, Optional
+
+# ── path injection so we can import from 'server' ────────────
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
