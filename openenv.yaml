@@ -1,28 +1,35 @@
 spec_version: 1
-name: "open-shop-scheduler"
-type: space
-runtime: fastapi
-benchmark: "meta-hackathon-v1"
-version: "1.0.0"
-description: "AI-driven Open Shop Scheduler for industrial environments."
+name: open-shop-scheduler
+type: environment
+runtime: docker
+app: server/app.py
+port: 7860
+
+metadata:
+  title: "Open Shop Scheduler AI"
+  description: "Meta PyTorch Hackathon: Optimizing manufacturing scheduling with RL."
+  version: "1.0.0"
+
+endpoints:
+  reset: "/reset"
+  step: "/step"
+  state: "/state"
+  tasks: "/tasks"
+  grade: "/grade"
 
 tasks:
-  - id: "easy_single_machine"
-    name: "Easy: Single Machine Scheduling"
-    description: "Solve a basic scheduling task on a single machine with changeovers."
-    difficulty: "easy"
-    grader: "envs.shop_scheduler_env.graders:grade_episode"
-  - id: "medium_parallel_changeover"
-    name: "Medium: Parallel Changeover"
-    description: "Optimize scheduling across parallel machines with job-specific setup times."
-    difficulty: "medium"
-    grader: "envs.shop_scheduler_env.graders:grade_episode"
-  - id: "hard_dynamic_arrivals"
-    name: "Hard: Dynamic Arrivals"
-    description: "Manage complex scheduling scenarios with jobs arriving dynamically at runtime."
-    difficulty: "hard"
-    grader: "envs.shop_scheduler_env.graders:grade_episode"
-
-app:
-  port: 7860
-  entrypoint: "server.app:app"
+  - id: easy_single_machine
+    name: "Easy: Single Machine"
+    description: "Basic scheduling task."
+    pass_criterion: "score >= 0.7"
+    difficulty: easy
+  - id: medium_parallel_changeover
+    name: "Medium: Parallel"
+    description: "Machines with changeovers."
+    pass_criterion: "score >= 0.6"
+    difficulty: medium
+  - id: hard_dynamic_arrivals
+    name: "Hard: Dynamic"
+    description: "Real-time task arrivals."
+    pass_criterion: "score >= 0.5"
+    difficulty: hard

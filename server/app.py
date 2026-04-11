@@ -67,6 +67,21 @@ async def reset(request: Request):
     obs = _api_env.reset()
     return JSONResponse(content=obs.model_dump())
 
+@app.get("/state")
+@app.post("/state")
+async def get_state():
+    global _api_env
+    return JSONResponse(content=_api_env.state().model_dump())
+
+@app.get("/tasks")
+@app.post("/tasks")
+async def get_tasks():
+    return JSONResponse(content=[
+        {"id": "easy_single_machine", "name": "Easy: Single Machine", "difficulty": "easy"},
+        {"id": "medium_parallel_changeover", "name": "Medium: Parallel", "difficulty": "medium"},
+        {"id": "hard_dynamic_arrivals", "name": "Hard: Dynamic", "difficulty": "hard"}
+    ])
+
 @app.post("/step")
 async def step(request: Request):
     try:
@@ -76,7 +91,18 @@ async def step(request: Request):
         # Provide a no-op safety action if body is missing
         action = Action(assignments=[])
     obs, reward_obj, done, info = _api_env.step(action)
-    return JSONResponse(content={"observation": obs.model_dump(), "reward": reward_obj.value, "done": done, "info": info})
+    response_data = {
+        "observation": obs.model_dump(),
+        "reward": reward_obj.value,
+        "done": done,
+        "info": info
+    }
+    if done:
+        grade_info = _compute_grade(_api_env.task_id)
+        response_data["final_grade"] = grade_info["score"]
+        response_data["score"] = grade_info["score"]
+        
+    return JSONResponse(content=response_data)
 
 # --- Hackathon-Specific Grading Endpoints (GET + POST for each task) ---
 @app.get("/grade/easy_single_machine")
@@ -94,7 +120,18 @@ async def grade_medium():
 async def grade_hard():
     return JSONResponse(content=_compute_grade("hard_dynamic_arrivals"))
 
-# Fallback
+# Fallback and standard /grade endpoint
+@app.get("/grade")
+@app.post("/grade")
+async def grade_body(request: Request):
+    task_id = "easy_single_machine"
+    try:
+        data = await request.json()
+        task_id = data.get("task_id", task_id)
+    except:
+        pass
+    return JSONResponse(content=_compute_grade(task_id))
+
 @app.get("/grade/{task_id}")
 @app.post("/grade/{task_id}")
 async def grade_generic(task_id: str):
