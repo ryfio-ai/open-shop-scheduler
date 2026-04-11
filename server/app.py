@@ -117,24 +117,30 @@ def grader(req: Optional[GraderRequest] = None):
 # ── /reset ────────────────────────────────────────────────────────────────────
 @app.post("/reset")
 def reset(req: Optional[ResetRequest] = None):
-    task_id = req.task_id if req else "easy_single_machine"
-    task = TASKS.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail=f"Unknown task_id: {task_id}")
+    try:
+        task_id = req.task_id if req else "easy_single_machine"
+        task = TASKS.get(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail=f"Unknown task_id: {task_id}")
 
-    episode_id = str(uuid.uuid4())
-    env = ShopEnvironment(task)
-    _sessions[episode_id] = env
+        episode_id = str(uuid.uuid4())
+        env = ShopEnvironment(task)
+        _sessions[episode_id] = env
 
-    obs = env.get_observation()
-    return {
-        "episode_id": episode_id,
-        "task_id": req.task_id,
-        "observation": obs,
-        "reward": 0.0,
-        "done": False,
-        "info": {},
-    }
+        obs = env.get_observation()
+        return {
+            "episode_id": episode_id,
+            "task_id": task_id,
+            "observation": obs,
+            "reward": 0.0,
+            "done": False,
+            "info": {},
+        }
+    except Exception as e:
+        import traceback
+        error_msg = f"Reset failed: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 # ── /step ─────────────────────────────────────────────────────────────────────
