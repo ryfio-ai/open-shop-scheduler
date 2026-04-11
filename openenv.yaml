@@ -2,27 +2,5 @@ spec_version: 1
 name: open-shop-scheduler
 type: space
 runtime: fastapi
-benchmark: "meta-hackathon-v1"
-version: "1.0.0"
-description: "AI-driven Open Shop Scheduler with complex constraints."
-
-tasks:
-  - id: easy_single_machine
-    name: "Easy: Single Machine"
-    description: "Schedule jobs on a single machine."
-    difficulty: "easy"
-    grader: "server.graders:EasyGrader"
-  - id: medium_parallel_changeover
-    name: "Medium: Parallel"
-    description: "Machines with changeovers."
-    difficulty: "medium"
-    grader: "server.graders:MediumGrader"
-  - id: hard_dynamic_arrivals
-    name: "Hard: Dynamic"
-    description: "Real-time task arrivals."
-    difficulty: "hard"
-    grader: "server.graders:HardGrader"
-
-app:
-  port: 7860
-  entrypoint: "server.app:app"
+app: server.app:app
+port: 7860

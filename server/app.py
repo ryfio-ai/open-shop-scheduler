@@ -15,6 +15,10 @@ from envs.shop_scheduler_env.graders import grade_episode
 
 app = FastAPI(title="Ryfio-AI: Industrial Scheduler API")
 
+@app.get("/health")
+async def health():
+    return JSONResponse(content={"status": "ok"})
+
 # --- Shared grading helper ---
 def _compute_grade(task_id: str) -> dict:
     """Run a quick episode and return a clamped score, as required by the validator."""
@@ -77,9 +81,24 @@ async def get_state():
 @app.post("/tasks")
 async def get_tasks():
     return JSONResponse(content=[
-        {"id": "easy_single_machine", "name": "Easy: Single Machine", "difficulty": "easy"},
-        {"id": "medium_parallel_changeover", "name": "Medium: Parallel", "difficulty": "medium"},
-        {"id": "hard_dynamic_arrivals", "name": "Hard: Dynamic", "difficulty": "hard"}
+        {
+            "id": "easy_single_machine",
+            "name": "Easy: Single Machine",
+            "difficulty": "easy",
+            "grader": True
+        },
+        {
+            "id": "medium_parallel_changeover",
+            "name": "Medium: Parallel",
+            "difficulty": "medium",
+            "grader": True
+        },
+        {
+            "id": "hard_dynamic_arrivals",
+            "name": "Hard: Dynamic",
+            "difficulty": "hard",
+            "grader": True
+        }
     ])
 
 @app.post("/step")
@@ -119,6 +138,17 @@ async def grade_medium():
 @app.post("/grade/hard_dynamic_arrivals")
 async def grade_hard():
     return JSONResponse(content=_compute_grade("hard_dynamic_arrivals"))
+
+# Canonical Hackathon Grader Endpoint
+@app.post("/grader")
+async def grader_endpoint(request: Request):
+    task_id = "easy_single_machine"
+    try:
+        data = await request.json()
+        task_id = data.get("task_id", task_id)
+    except Exception:
+        pass
+    return JSONResponse(content=_compute_grade(task_id))
 
 # Fallback and standard /grade endpoint
 @app.get("/grade")
