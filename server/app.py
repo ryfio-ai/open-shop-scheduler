@@ -48,13 +48,29 @@ def list_tasks():
     return {
         "tasks": [
             {
-                "id": t["id"],
-                "task_id": t["id"],
-                "name": t.get("name", t["id"].replace("_", " ").title()),
-                "description": t["description"],
-                "difficulty": t["difficulty"],
+                "id": "easy_single_machine",
+                "task_id": "easy_single_machine",
+                "name": "Easy Single Machine",
+                "description": "Schedule 5 jobs on 1 machine minimizing tardiness",
+                "difficulty": "easy",
+                "grader": "graders:grade_easy_single_machine"
+            },
+            {
+                "id": "medium_parallel_changeover",
+                "task_id": "medium_parallel_changeover",
+                "name": "Medium Parallel Changeover",
+                "description": "Schedule 6 jobs on 2 machines with family changeover penalties",
+                "difficulty": "medium",
+                "grader": "graders:grade_medium_parallel_changeover"
+            },
+            {
+                "id": "hard_dynamic_arrivals",
+                "task_id": "hard_dynamic_arrivals",
+                "name": "Hard Dynamic Arrivals",
+                "description": "Schedule 8 jobs on 3 machines with dynamic arrivals",
+                "difficulty": "hard",
+                "grader": "graders:grade_hard_dynamic_arrivals"
             }
-            for t in TASKS.values()
         ]
     }
 
@@ -63,7 +79,12 @@ def grader_endpoint(request: GraderRequest):
     """Grade an episode - REQUIRED for Phase 2 validation"""
     task_id = request.task_id
     
-    # Route to appropriate grader based on task
+    # DEBUG: Log everything
+    print(f"[DEBUG] === GRADER CALLED ===", flush=True)
+    print(f"[DEBUG] task_id: {task_id}", flush=True)
+    print(f"[DEBUG] episode_state type: {type(request.episode_state)}", flush=True)
+    print(f"[DEBUG] episode_state: {request.episode_state}", flush=True)
+    
     try:
         if task_id == "easy_single_machine":
             score = grade_easy_single_machine(request.episode_state)
@@ -72,16 +93,30 @@ def grader_endpoint(request: GraderRequest):
         elif task_id == "hard_dynamic_arrivals":
             score = grade_hard_dynamic_arrivals(request.episode_state)
         else:
+            print(f"[DEBUG] Unknown task: {task_id}", flush=True)
             raise HTTPException(status_code=400, detail=f"Unknown task: {task_id}")
+        
+        print(f"[DEBUG] Raw score from grader: {score} (type: {type(score)})", flush=True)
+        
+        # Ensure it's a float
+        if score is None:
+            print(f"[DEBUG] Score is None! Using 0.01", flush=True)
+            score = 0.01
+        else:
+            score = float(score)
+            
+        # Clamp to (0.01, 0.99)
+        score = max(0.01, min(0.99, score))
+        print(f"[DEBUG] Final score: {score}", flush=True)
+        
+        return GraderResponse(score=score, feedback="Graded successfully")
+        
     except Exception as e:
-        # Fallback to a safe low score if grading fails
-        print(f"Grading error: {e}")
-        score = 0.01
-
-    # CRITICAL: Clamp score to (0.01, 0.99)
-    score = float(max(0.01, min(0.99, score)))
-    
-    return GraderResponse(score=score, feedback="Graded successfully")
+        print(f"[DEBUG] EXCEPTION: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        # Return valid score even on error
+        return GraderResponse(score=0.01, feedback=f"Error: {str(e)}")
 
 @app.post("/reset")
 def reset(req: Optional[ResetRequest] = None):

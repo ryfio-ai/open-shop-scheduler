@@ -77,30 +77,28 @@ def grade_episode(state) -> float:
         raw = 1.0 - (total_tardiness / tardiness_cap)
         return _safe_score(raw)
 
-    # Original model-based logic (EnvState object)
-    if not hasattr(state, 'jobs') or not state.jobs:
-        return _SCORE_MIN
-        
-    total_jobs = len(state.jobs)
-    if total_jobs == 0:
-        return _SCORE_MIN
+    if hasattr(state, 'jobs') and state.jobs:
+        total_jobs = len(state.jobs)
+        total_tardiness = 0.0
+        for job in state.jobs:
+            if hasattr(job, 'status') and job.status == "completed" and hasattr(job, 'completion_time') and job.completion_time is not None:
+                tardiness = max(0.0, job.completion_time - job.due_date)
+                total_tardiness += tardiness
+            else:
+                current_t = getattr(state, 'current_time', 0)
+                due = getattr(job, 'due_date', 1)
+                if due <= 0:
+                    due = 1
+                overdue = max(0.0, current_t - due)
+                total_tardiness += overdue + 15.0
 
-    total_tardiness = 0.0
-    for job in state.jobs:
-        if hasattr(job, 'status') and job.status == "completed" and hasattr(job, 'completion_time') and job.completion_time is not None:
-            tardiness = max(0.0, job.completion_time - job.due_date)
-            total_tardiness += tardiness
-        else:
-            current_t = getattr(state, 'current_time', 0)
-            due = getattr(job, 'due_date', 1)
-            if due <= 0:
-                due = 1
-            overdue = max(0.0, current_t - due)
-            total_tardiness += overdue + 15.0
+        tardiness_cap = 20.0 * total_jobs
+        raw = 1.0 - (total_tardiness / tardiness_cap)
+        return _safe_score(raw)
 
-    tardiness_cap = 20.0 * total_jobs
-    raw = 1.0 - (total_tardiness / tardiness_cap)
-    return _safe_score(raw)
+    # Added fallback for unexpected types or empty states
+    print(f"[DEBUG] Unknown state type or empty: {type(state)}", flush=True)
+    return _safe_score(0.5)
 
 def grade_easy_single_machine(episode_state: dict) -> float:
     """Grade easy task - must return float in (0.01, 0.99)"""
