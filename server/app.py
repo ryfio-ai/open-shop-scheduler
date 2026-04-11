@@ -7,7 +7,12 @@ from pydantic import BaseModel
 # ── path injection so we can import from 'server' ────────────
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from server.environment import TASKS, ShopEnvironment, grade_schedule
+from server.environment import TASKS, ShopEnvironment
+from envs.shop_scheduler_env.graders import (
+    grade_easy_single_machine,
+    grade_medium_parallel_changeover,
+    grade_hard_dynamic_arrivals
+)
 
 app = FastAPI(title="OpenShop Scheduler", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -27,7 +32,11 @@ class ResetRequest(BaseModel):
 
 class GraderRequest(BaseModel):
     task_id: str
-    assignments: List[Assignment] = []
+    episode_state: dict
+
+class GraderResponse(BaseModel):
+    score: float
+    feedback: str
 
 @app.get("/health")
 def health():
@@ -35,31 +44,44 @@ def health():
 
 @app.get("/tasks")
 def list_tasks():
-    # Return as flat list for max compatibility with Scaler validator
-    return [
-        {
-            "id": t["id"],
-            "description": t["description"],
-            "difficulty": t["difficulty"],
-            "grader": True,
-            "has_grader": True,
-            "num_jobs": t.get("num_jobs", 0),
-            "num_machines": t.get("num_machines", 0),
-        }
-        for t in TASKS.values()
-    ]
+    """Return available tasks - REQUIRED for validation"""
+    return {
+        "tasks": [
+            {
+                "id": t["id"],
+                "task_id": t["id"],
+                "name": t.get("name", t["id"].replace("_", " ").title()),
+                "description": t["description"],
+                "difficulty": t["difficulty"],
+            }
+            for t in TASKS.values()
+        ]
+    }
 
 @app.post("/grader")
-def grader(req: Optional[GraderRequest] = None):
-    # Support empty body for robust validation
-    task_id = req.task_id if req else "easy_single_machine"
-    task = TASKS.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail=f"Unknown task_id: {task_id}")
+def grader_endpoint(request: GraderRequest):
+    """Grade an episode - REQUIRED for Phase 2 validation"""
+    task_id = request.task_id
     
-    assignments_raw = [{"machine_id": a.machine_id, "job_id": a.job_id} for a in req.assignments] if req else []
-    score = grade_schedule(task=task, assignments=assignments_raw)
-    return {"task_id": task_id, "score": score, "reward": score, "grader": "deterministic"}
+    # Route to appropriate grader based on task
+    try:
+        if task_id == "easy_single_machine":
+            score = grade_easy_single_machine(request.episode_state)
+        elif task_id == "medium_parallel_changeover":
+            score = grade_medium_parallel_changeover(request.episode_state)
+        elif task_id == "hard_dynamic_arrivals":
+            score = grade_hard_dynamic_arrivals(request.episode_state)
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown task: {task_id}")
+    except Exception as e:
+        # Fallback to a safe low score if grading fails
+        print(f"Grading error: {e}")
+        score = 0.01
+
+    # CRITICAL: Clamp score to (0.01, 0.99)
+    score = float(max(0.01, min(0.99, score)))
+    
+    return GraderResponse(score=score, feedback="Graded successfully")
 
 @app.post("/reset")
 def reset(req: Optional[ResetRequest] = None):
