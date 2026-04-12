@@ -11,10 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project
-COPY . .
-
-# Install as editable package
-RUN pip install -e .
+COPY --chown=1000:1000 . .
 
 # non-root user required by HF Spaces
 RUN useradd -m -u 1000 user 2>/dev/null || true
