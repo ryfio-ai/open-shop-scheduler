@@ -95,7 +95,7 @@ def grade_episode(state) -> float:
 
         for job in jobs:
             if hasattr(job, 'completion_time') and job.completion_time is not None:
-                due = getattr(job, 'due_date', 1)
+                due = getattr(job, 'due_time', None) or getattr(job, 'due_date', None) or 1
                 if due <= 0:
                     due = 1
                 tardiness = max(0.0, job.completion_time - due)
@@ -104,7 +104,7 @@ def grade_episode(state) -> float:
             elif hasattr(job, 'status'):
                 # Incomplete job penalty
                 current_t = getattr(state, 'current_time', 0)
-                due = getattr(job, 'due_date', 1)
+                due = getattr(job, 'due_time', None) or getattr(job, 'due_date', None) or 1
                 if due <= 0:
                     due = 1
                 overdue = max(0.0, current_t - due)
