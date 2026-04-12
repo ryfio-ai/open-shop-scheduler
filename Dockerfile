@@ -1,22 +1,25 @@
-FROM python:3.10-slim
+FROM ghcr.io/meta-pytorch/openenv-base:latest
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PORT=7860
 
-# non-root user required by HF Spaces
-RUN useradd -m -u 1000 user
 WORKDIR /app
 
-# install deps first (cache layer)
+# Install deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# copy everything and fix ownership
-COPY --chown=user:user . .
+# Copy project
+COPY . .
 
+# Install as editable package
+RUN pip install -e .
+
+# non-root user required by HF Spaces
+RUN useradd -m -u 1000 user 2>/dev/null || true
 USER user
+
 EXPOSE 7860
 
-# ── KEY: run server/app.py directly ──────────────────────────────
-CMD ["python", "server/app.py"]
+CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]

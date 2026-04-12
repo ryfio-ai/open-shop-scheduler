@@ -117,7 +117,7 @@ def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_ove
         models_to_try = [model_override] + models_to_try
     
     if not client:
-        yield {"logs": "Error: No API key set.", "completed": 0, "total_reward": 0.0, "status": "Error", "score": 0.01}
+        yield {"logs": "Error: No API key set.", "completed": 0, "total_reward": 0.0, "status": "Error", "score": 0.001}
         return
 
     env = ShopSchedulerEnv(task_id=task_id)
@@ -132,7 +132,7 @@ def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_ove
         "completed": len(obs.completed_jobs),
         "total_reward": 0.0,
         "status": "Starting",
-        "score": 0.01
+        "score": 0.001
     }
 
     done, step_count, rewards = False, 0, []

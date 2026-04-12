@@ -1,11 +1,11 @@
 """
 Bulletproof graders for Open Shop Scheduler.
-Handles ALL edge cases to ensure score is always in (0.01, 0.99).
+Handles ALL edge cases to ensure score is always in (0.001, 0.999).
 """
 
 # Safe bounds - strictly between 0 and 1
-_SCORE_MIN = 0.01
-_SCORE_MAX = 0.99
+_SCORE_MIN = 0.001
+_SCORE_MAX = 0.999
 
 
 def _safe_score(raw) -> float:
