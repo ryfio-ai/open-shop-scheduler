@@ -5,3 +5,22 @@ runtime: fastapi
 app: server.app:app
 port: 7860
 version: 0.1.0
+
+tasks:
+  - id: easy_single_machine
+    name: Easy Single Machine
+    description: Schedule 5 jobs on 1 machine minimizing tardiness
+    difficulty: easy
+    grader: server.graders:grade_easy_single_machine
+    
+  - id: medium_parallel_changeover
+    name: Medium Parallel Changeover
+    description: Schedule 6 jobs on 2 machines with family changeover penalties
+    difficulty: medium
+    grader: server.graders:grade_medium_parallel_changeover
+    
+  - id: hard_dynamic_arrivals
+    name: Hard Dynamic Arrivals
+    description: Schedule 8 jobs on 3 machines with dynamic arrivals
+    difficulty: hard
+    grader: server.graders:grade_hard_dynamic_arrivals
