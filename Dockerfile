@@ -20,6 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # copy everything and fix ownership
 COPY --chown=user:user . .
+RUN pip install --no-cache-dir -e .
 
 USER user
 EXPOSE 7860
