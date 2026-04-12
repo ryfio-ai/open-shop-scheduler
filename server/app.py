@@ -52,21 +52,21 @@ def list_tasks():
                 "name": "Easy Single Machine",
                 "description": "Schedule 5 jobs on 1 machine minimizing tardiness",
                 "difficulty": "easy",
-                "grader": "envs.shop_scheduler_env.graders:grade_easy_single_machine"
+                "grader": "server.graders:grade_easy_single_machine"
             },
             {
                 "id": "medium_parallel_changeover",
                 "name": "Medium Parallel Changeover",
                 "description": "Schedule 6 jobs on 2 machines with family changeover penalties",
                 "difficulty": "medium",
-                "grader": "envs.shop_scheduler_env.graders:grade_medium_parallel_changeover"
+                "grader": "server.graders:grade_medium_parallel_changeover"
             },
             {
                 "id": "hard_dynamic_arrivals",
                 "name": "Hard Dynamic Arrivals",
                 "description": "Schedule 8 jobs on 3 machines with dynamic arrivals",
                 "difficulty": "hard",
-                "grader": "envs.shop_scheduler_env.graders:grade_hard_dynamic_arrivals"
+                "grader": "server.graders:grade_hard_dynamic_arrivals"
             }
         ]
     }
