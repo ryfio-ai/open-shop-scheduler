@@ -94,7 +94,7 @@ def grade_schedule(task: Dict[str, Any], assignments: List[Dict[str, Any]]) -> f
     max_tard = sum(j["processing_time"] + changeover for j in task["jobs"]) or 1.0
     tardiness_score = max(0.0, 1.0 - total_tardiness / max_tard)
     raw = 0.5 * coverage + 0.5 * tardiness_score - penalty
-    return round(max(0.0, min(1.0, raw)), 4)
+    return round(max(0.01, min(0.99, raw)), 4)
 
 class ShopEnvironment:
     def __init__(self, task: Dict[str, Any]):
