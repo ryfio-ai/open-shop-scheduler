@@ -8,7 +8,7 @@ from pydantic import BaseModel
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server.environment import TASKS, ShopEnvironment
-from envs.shop_scheduler_env.graders import (
+from server.graders import (
     grade_easy_single_machine,
     grade_medium_parallel_changeover,
     grade_hard_dynamic_arrivals
