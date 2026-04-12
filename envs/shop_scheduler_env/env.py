@@ -45,7 +45,7 @@ class ShopSchedulerEnv:
             max_steps=scenario["max_steps"],
             done=False,
             total_raw_reward=0.0,
-            normalized_score=0.001,
+            normalized_score=0.01,
             machines=machines,
             jobs=jobs,
             action_history=[],

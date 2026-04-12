@@ -100,13 +100,13 @@ def grader_endpoint(request: GraderRequest):
 
         # Ensure it's a float
         if score is None:
-            print(f"[DEBUG] Score is None! Using 0.001", flush=True)
-            score = 0.001
+            print(f"[DEBUG] Score is None! Using 0.01", flush=True)
+            score = 0.01
         else:
             score = float(score)
 
-        # Clamp to (0.001, 0.999)
-        score = max(0.001, min(0.999, score))
+        # Clamp to (0.01, 0.99)
+        score = max(0.01, min(0.99, score))
         print(f"[DEBUG] Final score: {score}", flush=True)
 
         return GraderResponse(score=score, feedback="Graded successfully")
@@ -118,7 +118,7 @@ def grader_endpoint(request: GraderRequest):
         import traceback
         traceback.print_exc()
         # Return valid score even on error
-        return GraderResponse(score=0.001, feedback=f"Error: {str(e)}")
+        return GraderResponse(score=0.01, feedback=f"Error: {str(e)}")
 
 @app.post("/reset")
 def reset(req: Optional[ResetRequest] = None):

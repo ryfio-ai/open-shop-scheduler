@@ -90,7 +90,7 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
 
 def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> str:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    line = f"[END]   success={str(success).lower()} steps={steps} rewards={rewards_str}"
+    line = f"[END]   success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}"
     print(line, flush=True)
     return line
 
@@ -117,7 +117,7 @@ def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_ove
         models_to_try = [model_override] + models_to_try
     
     if not client:
-        yield {"logs": "Error: No API key set.", "completed": 0, "total_reward": 0.0, "status": "Error", "score": 0.001}
+        yield {"logs": "Error: No API key set.", "completed": 0, "total_reward": 0.0, "status": "Error", "score": 0.01}
         return
 
     env = ShopSchedulerEnv(task_id=task_id)
@@ -132,7 +132,7 @@ def run_inference_generator(task_id: str, strategy_mode: str = "Auto", model_ove
         "completed": len(obs.completed_jobs),
         "total_reward": 0.0,
         "status": "Starting",
-        "score": 0.001
+        "score": 0.01
     }
 
     done, step_count, rewards = False, 0, []
