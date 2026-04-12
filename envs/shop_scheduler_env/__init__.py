@@ -1,1 +1,1 @@
-# Mark shop_scheduler_env as a package
+# envs/shop_scheduler_env/__init__.py
