@@ -49,33 +49,24 @@ def list_tasks():
         "tasks": [
             {
                 "id": "easy_single_machine",
-                "task_id": "easy_single_machine",
                 "name": "Easy Single Machine",
                 "description": "Schedule 5 jobs on 1 machine minimizing tardiness",
                 "difficulty": "easy",
-                "max_steps": 50,
-                "grader": "envs.shop_scheduler_env.graders:grade_easy_single_machine",
-                "reward_range": [0.0, 1.0]
+                "grader": "envs.shop_scheduler_env.graders:grade_easy_single_machine"
             },
             {
                 "id": "medium_parallel_changeover",
-                "task_id": "medium_parallel_changeover",
                 "name": "Medium Parallel Changeover",
                 "description": "Schedule 6 jobs on 2 machines with family changeover penalties",
                 "difficulty": "medium",
-                "max_steps": 75,
-                "grader": "envs.shop_scheduler_env.graders:grade_medium_parallel_changeover",
-                "reward_range": [0.0, 1.0]
+                "grader": "envs.shop_scheduler_env.graders:grade_medium_parallel_changeover"
             },
             {
                 "id": "hard_dynamic_arrivals",
-                "task_id": "hard_dynamic_arrivals",
                 "name": "Hard Dynamic Arrivals",
                 "description": "Schedule 8 jobs on 3 machines with dynamic arrivals",
                 "difficulty": "hard",
-                "max_steps": 100,
-                "grader": "envs.shop_scheduler_env.graders:grade_hard_dynamic_arrivals",
-                "reward_range": [0.0, 1.0]
+                "grader": "envs.shop_scheduler_env.graders:grade_hard_dynamic_arrivals"
             }
         ]
     }
