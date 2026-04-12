@@ -1,4 +1,7 @@
-from .models import EnvState
+"""
+Graders for the Open Shop Scheduler environment.
+Each grader returns a float score in the strictly-open interval (0.01, 0.99).
+"""
 
 # Safe bounds that satisfy the validator's strict (0.0, 1.0) exclusive check
 # MUST be strictly between 0 and 1, not including boundaries
@@ -11,7 +14,10 @@ def _safe_score(raw: float) -> float:
     Also handles NaN and Inf cases.
     """
     if not isinstance(raw, (int, float)):
-        raw = float(raw)
+        try:
+            raw = float(raw)
+        except (ValueError, TypeError):
+            return _SCORE_MIN
     if raw != raw:  # Check for NaN (NaN != NaN)
         raw = _SCORE_MIN
     if raw == float('inf'):
@@ -28,25 +34,25 @@ def grade_episode(state) -> float:
     # Handle None or invalid state
     if state is None:
         return _SCORE_MIN
-    
+
     if isinstance(state, dict):
         # Handle different key names from episode_state
         jobs = state.get("jobs", []) or state.get("completed_jobs", [])
         current_time = state.get("current_time", 0)
-        
+
         # CRITICAL: If no jobs, return minimum valid score (not 0.0)
         if not jobs:
             return _SCORE_MIN
-        
+
         total_tardiness = 0.0
         for job in jobs:
             if isinstance(job, dict):
                 comp_time = job.get("completion_time")
-                
+
                 # FIX: Handle due_date=0 correctly - don't use 'or' operator!
                 due_date = job.get("due_date")
                 due_time_val = job.get("due_time")
-                
+
                 # Explicit None check to avoid 0 being treated as falsy
                 if due_date is not None:
                     due_time = due_date
@@ -54,7 +60,7 @@ def grade_episode(state) -> float:
                     due_time = due_time_val
                 else:
                     due_time = 1  # Default fallback
-                
+
                 # Prevent division by zero or negative due times
                 if due_time <= 0:
                     due_time = 1
@@ -96,18 +102,44 @@ def grade_episode(state) -> float:
         raw = 1.0 - (total_tardiness / tardiness_cap)
         return _safe_score(raw)
 
-    # Added fallback for unexpected types or empty states
+    # Fallback for unexpected types or empty states
     print(f"[DEBUG] Unknown state type or empty: {type(state)}", flush=True)
     return _safe_score(0.5)
 
-def grade_easy_single_machine(episode_state: dict) -> float:
+
+def grade_easy_single_machine(episode_state=None) -> float:
     """Grade easy task - must return float in (0.01, 0.99)"""
+    if episode_state is None:
+        episode_state = {}
     return grade_episode(episode_state)
 
-def grade_medium_parallel_changeover(episode_state: dict) -> float:
-    """Grade medium task"""
+def grade_medium_parallel_changeover(episode_state=None) -> float:
+    """Grade medium task - must return float in (0.01, 0.99)"""
+    if episode_state is None:
+        episode_state = {}
     return grade_episode(episode_state)
 
-def grade_hard_dynamic_arrivals(episode_state: dict) -> float:
-    """Grade hard task"""
+def grade_hard_dynamic_arrivals(episode_state=None) -> float:
+    """Grade hard task - must return float in (0.01, 0.99)"""
+    if episode_state is None:
+        episode_state = {}
     return grade_episode(episode_state)
+
+
+def grade(task_id: str = "", episode_state=None) -> float:
+    """
+    Unified grader entry point. Routes to the correct task grader.
+    Compatible with the OpenEnv validator calling convention.
+    """
+    if episode_state is None:
+        episode_state = {}
+
+    if task_id == "easy_single_machine":
+        return grade_easy_single_machine(episode_state)
+    elif task_id == "medium_parallel_changeover":
+        return grade_medium_parallel_changeover(episode_state)
+    elif task_id == "hard_dynamic_arrivals":
+        return grade_hard_dynamic_arrivals(episode_state)
+    else:
+        # Unknown task - still return a valid score
+        return grade_episode(episode_state)

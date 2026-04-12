@@ -4,8 +4,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# ── path injection so we can import from 'server' ────────────
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# ── path injection so we can import from project root ────────────
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server.environment import TASKS, ShopEnvironment
 from envs.shop_scheduler_env.graders import (
@@ -53,7 +53,9 @@ def list_tasks():
                 "name": "Easy Single Machine",
                 "description": "Schedule 5 jobs on 1 machine minimizing tardiness",
                 "difficulty": "easy",
-                "grader": "graders:grade_easy_single_machine"
+                "max_steps": 50,
+                "grader": "envs.shop_scheduler_env.graders:grade_easy_single_machine",
+                "reward_range": [0.0, 1.0]
             },
             {
                 "id": "medium_parallel_changeover",
@@ -61,7 +63,9 @@ def list_tasks():
                 "name": "Medium Parallel Changeover",
                 "description": "Schedule 6 jobs on 2 machines with family changeover penalties",
                 "difficulty": "medium",
-                "grader": "graders:grade_medium_parallel_changeover"
+                "max_steps": 75,
+                "grader": "envs.shop_scheduler_env.graders:grade_medium_parallel_changeover",
+                "reward_range": [0.0, 1.0]
             },
             {
                 "id": "hard_dynamic_arrivals",
@@ -69,7 +73,9 @@ def list_tasks():
                 "name": "Hard Dynamic Arrivals",
                 "description": "Schedule 8 jobs on 3 machines with dynamic arrivals",
                 "difficulty": "hard",
-                "grader": "graders:grade_hard_dynamic_arrivals"
+                "max_steps": 100,
+                "grader": "envs.shop_scheduler_env.graders:grade_hard_dynamic_arrivals",
+                "reward_range": [0.0, 1.0]
             }
         ]
     }
@@ -78,16 +84,16 @@ def list_tasks():
 def grader_endpoint(request: GraderRequest):
     """Grade an episode - REQUIRED for Phase 2 validation"""
     task_id = request.task_id
-    
+
     # Handle missing or None episode_state
     episode_state = request.episode_state if request.episode_state is not None else {}
-    
+
     # DEBUG: Log everything
     print(f"[DEBUG] === GRADER CALLED ===", flush=True)
     print(f"[DEBUG] task_id: {task_id}", flush=True)
     print(f"[DEBUG] episode_state type: {type(episode_state)}", flush=True)
-    print(f"[DEBUG] episode_state: {episode_state}", flush=True)
-    
+    print(f"[DEBUG] episode_state keys: {list(episode_state.keys()) if isinstance(episode_state, dict) else 'N/A'}", flush=True)
+
     try:
         if task_id == "easy_single_machine":
             score = grade_easy_single_machine(episode_state)
@@ -98,22 +104,24 @@ def grader_endpoint(request: GraderRequest):
         else:
             print(f"[DEBUG] Unknown task: {task_id}", flush=True)
             raise HTTPException(status_code=400, detail=f"Unknown task: {task_id}")
-        
+
         print(f"[DEBUG] Raw score from grader: {score} (type: {type(score)})", flush=True)
-        
+
         # Ensure it's a float
         if score is None:
             print(f"[DEBUG] Score is None! Using 0.01", flush=True)
             score = 0.01
         else:
             score = float(score)
-            
+
         # Clamp to (0.01, 0.99)
         score = max(0.01, min(0.99, score))
         print(f"[DEBUG] Final score: {score}", flush=True)
-        
+
         return GraderResponse(score=score, feedback="Graded successfully")
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[DEBUG] EXCEPTION: {e}", flush=True)
         import traceback
@@ -128,16 +136,16 @@ def reset(req: Optional[ResetRequest] = None):
     task = TASKS.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail=f"Unknown task_id: {task_id}")
-    
+
     episode_id = str(uuid.uuid4())
     env = ShopEnvironment(task)
     _sessions[episode_id] = env
     return {
-        "episode_id": episode_id, 
+        "episode_id": episode_id,
         "task_id": task_id,
-        "observation": env.get_observation(), 
-        "reward": 0.0, 
-        "done": False, 
+        "observation": env.get_observation(),
+        "reward": 0.0,
+        "done": False,
         "info": {}
     }
 
